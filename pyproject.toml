@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "naimco"
+version = "0.0.1"
+description = "Package to control Naim Mu-so sound systems"
+authors = ["Yngvi Þór Sigurjónsson <blitzkopf@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
