@@ -17,7 +17,7 @@ def dict_to_etree(d):
                 _to_etree(ET.SubElement(parent,k),v)
         elif isinstance(d,list):
             for i in d:
-                print(f"recursing this {i}")
+                _LOG.debug(f"recursing this {i}")
                 parent.append(dict_to_etree(i))
         else:
             assert d == 'invalid type', (type(d), d)

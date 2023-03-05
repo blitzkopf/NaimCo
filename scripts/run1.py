@@ -15,13 +15,11 @@ async def replay(device):
     await device.tcp_controller.send_command('GetUPnPMediaRendererList')
     await asyncio.sleep(1)
     await device.tcp_controller.send_command('GetPlaylistStats')
-    await device.nvm_controller.send_command('GOTOPRESET 2')
+    #await device.nvm_controller.send_command('GOTOPRESET 2')
     await device.tcp_controller.send_command('GetViewState')
     await device.tcp_controller.send_command('GetActiveList')
     await asyncio.sleep(2)
-   
        
-    
 
 async def main():
     root = logging.getLogger()

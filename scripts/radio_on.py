@@ -20,13 +20,15 @@ args = parser.parse_args()
 async def radio_on(device,preset,volume=None):
     await device.initialize()
     _LOG.info(f"Turning on radio preset {preset} volume {volume}")
-    await device.on()
-    await device.nvm_controller.send_command(f'GOTOPRESET {preset}')
+    await device.controller.nvm.send_command(f'GOTOPRESET {preset}')
     if(volume):
-        await device.nvm_controller.send_command(f'SETRVOL {volume}')
+        await device.controller.nvm.send_command(f'SETRVOL {volume}')
+    await device.on()
 
-    await device.tcp_controller.send_command('GetViewState')
-    await device.tcp_controller.send_command('GetActiveList') 
+    await device.controller.send_command('GetViewState')
+    await device.controller.send_command('GetNowPlaying')
+    
+    #await device.controller.send_command('GetActiveList') 
 
 async def main():
     root = logging.getLogger()
@@ -49,7 +51,8 @@ async def main():
         task1 = tg.create_task(device.run_connection())
         task2 = tg.create_task(radio_on(device,args.preset,args.volume))
     _LOG.info("Both tasks have completed now.")
-  
+    _LOG.info(f"View State: {device.state.view_state} ")
+    _LOG.info(f"Now Playing: {device.state.now_playing} ")
 
 if __name__ == "__main__":
     start = time.time()

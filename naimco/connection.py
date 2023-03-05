@@ -41,7 +41,7 @@ class Connection:
         self.writer.close()
 
     async def send(self,message):
-        print(f'Send: {message!r}')
+        _LOG.debug(f'Send: {message!r}')
         self.writer.write(message.encode())
         await self.writer.drain()
 
