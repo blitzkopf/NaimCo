@@ -11,6 +11,8 @@ def dict_to_etree(d):
             pass
         elif isinstance(d, str):
             parent.text=d
+        elif isinstance(d, int):
+            parent.text=str(d)
         elif isinstance(d,dict):
             for k,v in d.items():
                 assert isinstance(k, str)
