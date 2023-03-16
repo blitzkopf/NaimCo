@@ -3,10 +3,12 @@ name = "naimco"
 version = "0.0.1"
 description = "Package to control Naim Mu-so sound systems"
 authors = ["Yngvi Þór Sigurjónsson <blitzkopf@gmail.com>"]
-readme = "README.md"
+readme = "README.rst"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+asyncio = "^3.4.3"
+logging = "^0.4.9.6"
 
 
 [build-system]
