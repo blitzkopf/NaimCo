@@ -31,10 +31,10 @@ class NaimCo:
 
     async def run_connection(self,timeout=None):
         #await self.connect()
-        async with asyncio.TaskGroup() as tg:
-            tg.create_task(self.controller.receiver())
-            if timeout:
-                tg.create_task(self.controller.keep_alive(timeout))
+        
+        asyncio.create_task(self.controller.receiver())
+        if timeout:
+            await(self.controller.keep_alive(timeout))
 
         _LOG.warn("Connection to naim closed")
         # what just happened, how did it happen?
