@@ -160,6 +160,13 @@ class Controller:
         """
         self.naimco.state.set_active_list(val)
 
+    def _Ping(self,val,id):
+        """Respond to Ping replies
+        
+        Just do nothing keep the connection open
+        """
+        pass
+
     def _GetNowPlayingTime(self,val,id):
         """Respond to GetNowPlaying time
         
@@ -243,12 +250,12 @@ class NVMController:
         event = event.replace(':','_')
         event = event.replace('-','minus')
         event = event.replace('+','plus')
-        method = getattr(self.__class__,'_'+event)
+        method = getattr(self.__class__,'_'+event,None)
         if method:
             method(self,tokens)
         else: 
             _LOG.warn(f'Unhandled message from NVM {msg}')
-    
+            
     def _GOTOPRESET(self,tokens):
         _LOG.debug(f"Playing iRadio preset number {tokens[0]} {tokens[1]}")
     
@@ -256,27 +263,27 @@ class NVMController:
         # #NVM PREAMP 2 0 0 IRADIO OFF OFF OFF ON "iRadio" OFF
         volume = tokens[0]
         input = tokens[3]
+        mute = tokens[4]
         input_label = tokens[8]
-        self.state.set_volume(volume)
-        self.state.set_input(input)
+        self.state.volume=volume
+        self.state.input=input
 
         _LOG.debug(f"Volume set  {tokens[0]} {tokens[1]}")
     def _VOLminus(self,tokens):
         # #NVM VOL- 10 OK
         volume = tokens[0]
-        self.state.set_volume(volume)
+        self.state.volume=volume
 
     def _VOLplus(self,tokens):
         # #NVM VOL+ 10 OK
         volume = tokens[0]
-        self.state.set_volume(volume)
+        self.state.volume=volume
 
     def _SETSTANDBY(self,tokens):
         #NVM SETSTANDBY OK
         # standby status not reported, we need to query
         if tokens[0] != 'OK':
             _LOG.warn(f"SETSTANDBY reports {tokens[0]}")
-
 
     def _SETRVOL(self,tokens):
         if tokens[0] != 'OK':
@@ -294,9 +301,9 @@ class NVMController:
         input = tokens[6]
         compact_name = tokens[7]
         fullname = tokens[9]
-        self.state.set_viewstate({'state':state,'phase':phase,'preset':preset,
+        self.state.viewstate={'state':state,'phase':phase,'preset':preset,
                                 'input':input,'compact_name':compact_name,
-                                'fullname':fullname})
+                                'fullname':fullname}
 
     def _ERROR_(self,tokens):
         # #NVM ERROR: [11] Command not allowed in current system configuration
@@ -311,27 +318,39 @@ class NVMController:
         state = tokens[0]
         description = tokens[1]
         logo_url = tokens[2]
-        self.state.set_briefnp({'state':state,'description':description,'logo_url':logo_url})
+        self.state.briefnp = {'state':state,'description':description,'logo_url':logo_url}
     
     def _GETBUFFERSTATE(self,tokens):
         # #NVM GETBUFFERSTATE 0
-        self.state.set_bufferstate(tokens[0])
+        self.state.bufferstate=tokens[0]
+    
     def _ALARMSTATE(self,tokens):
         # #NVM ALARMSTATE TIME_ADJUST
-        # Don't know what this is maybe something to do with heartbeat 
+        # Don't know what this is seems to happen every minute on the minute
         pass
+
     def _SETINPUT(self,tokens):
         #NVM SETINPUT OK
         if tokens[0] != 'OK':
             _LOG.warn(f"SETINPUT reports {tokens[0]}")
+    
+    def _GETINPUTBLK(self,tokens:list[str]):
+        #NVM GETINPUTBLK 1 10 1 IRADIO "iRadio"
+        #NVM GETINPUTBLK 2 10 1 MULTIROOM "Multiroom"
+        index:int =int(tokens[0])
+        id:str = tokens[3]
+        name:str = tokens[4]
+        self.state.set_inputblk_entry(index,{'id':id,'name':name})
 
     def _GETSTANDBYSTATUS(self,tokens):
         #NVM GETSTANDBYSTATUS ON NETWORK
         state = tokens[0]
         type = tokens[1]
-        self.state.set_standby_status({'state':state,'type':type})
+        self.state.standbystatus = {'state':state,'type':type}
+    
     def _PONG(self,tokens):
         pass
+    
     def _GETVIEWMESSAGE(self,tokens):
         #NVM GETVIEWMESSAGE SKIPFILE
         pass
@@ -340,4 +359,16 @@ class NVMController:
         #NVM PLAY OK
         if tokens[0] != 'OK':
             _LOG.warn(f"PLAY reports {tokens[0]}")
+    
+    def _PRODUCT(self,tokens):
+        #NVM PRODUCT MUSO
+        self.state.product=tokens[0]
+
+    def _GETSERIALNUM(self,tokens):
+        #NVM GETSERIALNUM 1107010284
+        self.state.serialnum=tokens[0]
+    
+    def _GETROOMNAME(self,tokens):
+        #NVM GETROOMNAME "Livingroom"
+        self.state.roomname=tokens[0]
 

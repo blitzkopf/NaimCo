@@ -52,6 +52,12 @@ class NaimCo:
     async def off(self):
         await self.controller.nvm.send_command('SETSTANDBY ON')
 
+    def get_standbystatus(self):
+        return self.state.standbystatus
+    
+    def get_volume(self):
+        return self.state.volume
+    
     async def set_volume(self,volume):
         await self.controller.nvm.send_command(f'SETRVOL {volume}')
 
@@ -61,23 +67,29 @@ class NaimCo:
     async def volume_down(self):
         await self.controller.nvm.send_command(f'VOL-')
     
+    def get_input(self):
+        return self.state.input
+
+    def get_product(self):
+        return self.state.product
+
+    def get_serialnum(self):
+        return self.state.serialnum
+
+    def get_roomname(self):
+        return self.state.roomname
+    
+    def get_inputs(self) -> dict[int,dict]:
+        return self.state.inputblk
+
     async def select_input(self,input):
         await self.controller.nvm.send_command(f'SETINPUT {input}')
     
     async def select_preset(self,preset):
         await self.controller.nvm.send_command(f'GOTOPRESET {preset}')
-
-    def get_input(self):
-        return self.state.input
     
-    def get_volume(self):
-        return self.state.volume
-
     def get_viewstate(self):
         return self.state.viewstate
-    
-    def get_standby_status(self):
-        return self.state.standby_status
 
     def get_now_playing(self):
         resp={}
@@ -106,33 +118,100 @@ class NaimCo:
         return resp
 
 class NaimState:
+
+ 
     def __init__(self):
+        # NVM properties
+        self._input:str = None 
+        self._volume:int = None
+        self._standbystatus:dict = None
+        self._bufferstate:int = None
+        self._inputblk:dict[int,dict] = {}
+        self._viewstate:dict = None
+        self._briefnp:dict = None
+        self._product:str = None
+        self._serialnum:str = None
+        self._roomname:str = None
+        # XML properties
         self.view_state = None
         self.now_playing = None
         self.now_playing_time = None
         self.active_list = None
-        #NVM 
-        self.volume = None
-        self.bufferstate = None
-        self.views_tate = None
-        self.briefno = None
-        self.standby_status = None
-        self.input = None
-        self.viewstate = None
+    
+    @property
+    def volume(self) -> int:
+        return self._volume
+    @volume.setter
+    def volume(self,volume:int):
+        self._volume=volume
+    
+    @property
+    def input(self) -> str:
+        return self._input
+    @input.setter
+    def input(self,input:str):
+        self._input=input
 
-    def set_volume(self,volume):
-        self.volume=volume
+    @property
+    def viewstate(self)->dict:
+        return self._viewstate
+    @viewstate.setter
+    def viewstate(self,state:dict):
+        """ NVM view state"""
+        self._viewstate=state
     
-    def set_input(self,input):
-        self.input=input
+    @property
+    def briefnp(self)->dict:
+        return self._briefnp
+    @briefnp.setter
+    def briefnp(self,briefnp):
+        self._briefnp=briefnp
     
+    @property
+    def bufferstate(self) -> int:
+        return self._bufferstate
+    @bufferstate.setter
+    def bufferstate(self,bufferstate:int):
+        self._bufferstate=bufferstate
+    
+    @property
+    def standbystatus(self) -> dict:
+        return self._standbystatus
+    @standbystatus.setter
+    def standbystatus(self,standbystatus:dict):
+        self._standbystatus=standbystatus
+    
+    @property
+    def inputblk(self) -> list[dict]:
+        return self._inputblk
+    
+    @property
+    def product(self) -> str:
+        return self._product
+    @product.setter
+    def product(self,product:str):
+        self._product = product
+
+    @property
+    def serialnum(self) -> str:
+        return self._serialnum
+    @serialnum.setter
+    def serialnum(self,serialnum:str):
+        self._serialnum = serialnum    
+        
+    @property
+    def roomname(self) -> str:
+        return self._roomname
+    @roomname.setter
+    def roomname(self,roomname:str):
+        self._roomname = roomname
+
+    def set_inputblk_entry(self,index:int,val:dict):
+        self._inputblk[index] = val
+
     def set_view_state(self,state):
         self.view_state=state
     
-    def set_viewstate(self,state):
-        """ NVM view state"""
-        self.viewstate=state
-
     def set_now_playing(self,state):
         self.now_playing=state
     
@@ -141,12 +220,3 @@ class NaimState:
     
     def set_now_playing_time(self,state):
         self.now_playing_time=state
-    
-    def set_briefnp(self,brief):
-        self.briefno=brief
-
-    def set_bufferstate(self,bufferstate):
-        self.bufferstate=bufferstate
-
-    def set_standby_status(self,standby_status):
-        self.standby_status=standby_status
