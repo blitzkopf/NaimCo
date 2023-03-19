@@ -80,7 +80,7 @@ class NaimCo:
         return self.state.roomname
     
     def get_inputs(self) -> dict[int,dict]:
-        return self.state.inputblk
+        return {inp['id']:inp['name'] for inp in self.state.inputblk.values()}
 
     async def select_input(self,input):
         await self.controller.nvm.send_command(f'SETINPUT {input}')
