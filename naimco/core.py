@@ -21,7 +21,6 @@ class NaimCo:
         self.cmd_id = 0
         self.state = NaimState()
         self.controller = None
-        self.product = None
         self.version = None
         _LOG.debug("Created NaimCo instance for ip: %s", ip_address)
   
