@@ -148,8 +148,8 @@ class Controller:
         Register the now playing data in the NaimCo device object.
         Mu-so will both send these as replies when commanded and as events when
         changing tracks.
-
         """
+        _LOG.debug(f"GetNowPlaying: {val}")
         self.naimco.state.set_now_playing(val)
     
     def _GetActiveList(self,val,id):
@@ -216,6 +216,11 @@ class Controller:
         await self.send_command('SetHeartbeatTimeout',
             [{'item': {'name':'timeout','int':f'{timeout}'}}]
         )
+def nanone(value:str)->str|None:
+    """Handle NA string in value
+    
+    Returns None if value is NA, value otherwise """
+    return None if value==None else value
 
 class NVMController:
     def __init__(self,controller):
@@ -295,12 +300,12 @@ class NVMController:
         # #NVM GETVIEWSTATE PLAYING CONNECTING 2 N N NA IRADIO "Rás2RÚV901" "Rás 2 RÚV 90.1 FM" NA NA
         # #NVM GETVIEWSTATE PLAYING ANALYSING NA N N NA SPOTIFY NA NA NA NA
         # There is also GetViewState XML Event
-        state = tokens[0]
-        phase = tokens[1] 
-        preset = tokens[2] 
-        input = tokens[6]
-        compact_name = tokens[7]
-        fullname = tokens[9]
+        state = nanone(tokens[0])
+        phase = nanone(tokens[1])
+        preset = nanone(tokens[2])
+        input = nanone(tokens[6])
+        compact_name = nanone(tokens[7])
+        fullname = nanone(tokens[9])
         self.state.viewstate={'state':state,'phase':phase,'preset':preset,
                                 'input':input,'compact_name':compact_name,
                                 'fullname':fullname}
@@ -315,9 +320,9 @@ class NVMController:
     
     def _GETBRIEFNP(self,tokens):
         # #NVM GETBRIEFNP PLAY "Rás 2 RÚV 90.1 FM" "http://http.cdnlayer.com/vt/logo/logo-1318.jpg" NA NA NA
-        state = tokens[0]
-        description = tokens[1]
-        logo_url = tokens[2]
+        state = nanone(tokens[0])
+        description = nanone(tokens[1])
+        logo_url = nanone(tokens[2])
         self.state.briefnp = {'state':state,'description':description,'logo_url':logo_url}
     
     def _GETBUFFERSTATE(self,tokens):

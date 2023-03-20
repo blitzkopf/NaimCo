@@ -52,10 +52,11 @@ class NaimCo:
     async def off(self):
         await self.controller.nvm.send_command('SETSTANDBY ON')
 
-    def get_standbystatus(self):
+    @property 
+    def standbystatus(self):
         return self.state.standbystatus
-    
-    def get_volume(self):
+    @property
+    def volume(self):
         return self.state.volume
     
     async def set_volume(self,volume):
@@ -67,19 +68,24 @@ class NaimCo:
     async def volume_down(self):
         await self.controller.nvm.send_command(f'VOL-')
     
-    def get_input(self):
+    @property
+    def input(self):
         return self.state.input
 
-    def get_product(self):
+    @property
+    def product(self):
         return self.state.product
 
-    def get_serialnum(self):
+    @property
+    def serialnum(self):
         return self.state.serialnum
 
-    def get_roomname(self):
+    @property
+    def roomname(self):
         return self.state.roomname
-    
-    def get_inputs(self) -> dict[int,dict]:
+
+    @property
+    def inputs(self) -> dict[int,dict]:
         return {inp['id']:inp['name'] for inp in self.state.inputblk.values()}
 
     async def select_input(self,input):
@@ -88,8 +94,50 @@ class NaimCo:
     async def select_preset(self,preset):
         await self.controller.nvm.send_command(f'GOTOPRESET {preset}')
     
-    def get_viewstate(self):
+
+    @property
+    def viewstate(self):
         return self.state.viewstate
+    
+    @property
+    def media_image_url(self) -> str | None:
+        """Image url of current playing media."""
+        if not self.state.briefnp:
+            return None
+        return self.state.briefnp.get("logo_url", None)
+        # self.state.briefnp = {'state':state,'description':description,'logo_url':logo_url}
+
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        """If the image url is remotely accessible."""
+        # it depends on what it playing, leave it at True for now
+        return True
+
+    @property
+    def media_title(self) -> str | None:
+        """Title of current playing media."""
+        if not self.state.now_playing:
+            return None
+        return self.state.now_playing.get("title", None)
+
+    @property
+    def media_artist(self) -> str | None:
+        """Artist of current playing media, music track only."""
+        if not self.state.now_playing:
+            return None
+        if metadata := self.state.now_playing.get("metadata", None):
+            return metadata.get("artist", None)
+        return None
+
+    @property
+    def media_album_name(self) -> str | None:
+        """Album name of current playing media, music track only."""
+        if not self.state.now_playing:
+            return None
+        if metadata := self.state.now_playing.get("metadata", None):
+            _LOGGER.warning(f"Metadata {metadata}")
+            return metadata.get("album", None)
+        return None
 
     def get_now_playing(self):
         resp={}
