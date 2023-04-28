@@ -86,6 +86,10 @@ class NaimCo:
     @property
     def inputs(self) -> dict[int,dict]:
         return {inp['id']:inp['name'] for inp in self.state.inputblk.values()}
+    
+    @property
+    def presets(self) -> dict[int,dict]:
+        return {index:preset['name'] for index,preset in self.state.presetblk.items()}
 
     async def select_input(self,input):
         await self.controller.nvm.send_command(f'SETINPUT {input}')
@@ -134,7 +138,6 @@ class NaimCo:
         if not self.state.now_playing:
             return None
         if metadata := self.state.now_playing.get("metadata", None):
-            _LOGGER.warning(f"Metadata {metadata}")
             return metadata.get("album", None)
         return None
 
@@ -179,6 +182,10 @@ class NaimState:
         self._product:str = None
         self._serialnum:str = None
         self._roomname:str = None
+        self._totalpresets:int|None = None
+        self._presetblk:dict[int,dict] = {}
+
+
         # XML properties
         self.view_state = None
         self.now_playing = None
@@ -231,7 +238,9 @@ class NaimState:
     @property
     def inputblk(self) -> list[dict]:
         return self._inputblk
-    
+    def set_inputblk_entry(self,index:int,val:dict):
+        self._inputblk[index] = val
+
     @property
     def product(self) -> str:
         return self._product
@@ -253,8 +262,22 @@ class NaimState:
     def roomname(self,roomname:str):
         self._roomname = roomname
 
-    def set_inputblk_entry(self,index:int,val:dict):
-        self._inputblk[index] = val
+    @property
+    def totalpresets(self) -> int|None:
+        return self._totalpresets
+    @totalpresets.setter
+    def totalpresets(self,totalpresets:int|None):
+        self._totalpresets = totalpresets
+    
+    @property
+    def presetblk(self) -> list[dict]:
+        return self._presetblk
+    def set_presetblk_entry(self,index:int,val:dict):
+        _LOG.debug(f"presetblk_entry {index} {val}")
+        if val['state']=='USED':
+            self._presetblk[index] = val
+        else:
+            self._presetblk.pop(index, None)
 
     def set_view_state(self,state):
         self.view_state=state

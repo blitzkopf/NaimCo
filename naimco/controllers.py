@@ -376,4 +376,19 @@ class NVMController:
     def _GETROOMNAME(self,tokens):
         #NVM GETROOMNAME "Livingroom"
         self.state.roomname=tokens[0]
-
+    
+    def _GETTOTALPRESETS(self,tokens):
+        #NVM GETTOTALPRESETS 40
+        self.state.totalpresets=tokens[0]
+        ## do this her while we don't have any event processing or waiting for response
+        asyncio.create_task(self.send_command(f"GETPRESETBLK 1 {tokens[0]}"))
+    
+    def _GETPRESETBLK(self,tokens:list[str]):
+        #NVM GETPRESETBLK 1 40 USED "Rás 1 RÚV 93.5 FM" INTERNET 0 NONE NORMAL
+        #NVM GETPRESETBLK 2 40 USED "Rás 2 RÚV 90.1 FM" INTERNET 0 NONE NORMAL
+        index:int =int(tokens[0])
+        max:int = int(tokens[1])
+        state:str = tokens[2]
+        name:str = tokens[3]
+        transport:str = tokens[4]
+        self.state.set_presetblk_entry(index,{ 'state':state,'name':name,'transport':transport})
