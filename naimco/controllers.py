@@ -34,6 +34,22 @@ class Controller:
         """
         # TODO: deal with connection failures and dropped connections
         self.connection=await Connection.create_connection(self.naimco.ip_address)
+
+    async def initialize(self):
+        """Initializes the controller
+        
+        Sends the initial commands to the Mu-so device to get the initial state.
+        """
+        await self.enable_v1_api()
+        await self.get_bridge_co_app_version()
+    
+    async def startup(self):
+        """Starts up the controller
+        
+        Connects to the Mu-so device and initializes the controller.
+        """
+        await self.connect()
+        await self.initialize()
     
     async def receiver(self):
         """Coroutine that reads incoming stream from Connection
@@ -55,6 +71,7 @@ class Controller:
                 data = await self.connection.receive()
             except ConnectionAbortedError as e:
                 # TODO:deal with connection failures and dropped connections
+                _LOG.error(f'Connection aborted: {e}')
                 return
             if len(data)>0:
                 _LOG.debug(f'Received: {data!r}')

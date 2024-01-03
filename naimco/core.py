@@ -7,8 +7,24 @@ from .controllers import Controller
 _LOG = logging.getLogger(__name__)
 
 class NaimCo:
+    """The main class for interacting with a Naim Mu-so device.
+
+    This is the class that the "end user" will interact with. 
+    """
     
     def __init__(self, ip_address):
+        """Initialize a NaimCo instance.
+
+        Parameters
+        ----------
+        ip_address : str
+            IP-address of the Mu-so speaker.
+
+        Raises
+        ------
+        ValueError
+            If `ip_address` is not a valid IP address string.
+        """
         # Note: Creation of a NaimCo instance should be as cheap and quick as
         # possible. Do not make any network calls here
         super().__init__()
@@ -25,10 +41,26 @@ class NaimCo:
         _LOG.debug("Created NaimCo instance for ip: %s", ip_address)
   
     async def startup(self):
+        """Connect to the Mu-so device and get the initial state.
+
+        This method should be called before any other interaction with the device.
+        """
+        # Note: This method should be called after the event loop is running
+        # and before any other interaction with the device is attempted.
+        _LOG.debug("Starting up NaimCo instance for ip: %s", self.ip_address)
         self.controller=Controller(self)
-        await self.controller.connect()
+        await self.controller.startup()
 
     async def run_connection(self,timeout=None):
+        """Run a connection to the Mu-so device.
+
+        This method is a convenience method that calls `startup()`, `connect()` and `shutdown()` in sequence.
+
+        Parameters
+        ----------
+        timeout : int, optional
+            timeout in seconds for the `keep_alive()` method. If `None` then no keep alive is sent.
+        """
         #await self.connect()
         
         asyncio.create_task(self.controller.receiver())
@@ -38,11 +70,6 @@ class NaimCo:
         _LOG.warn("Connection to naim closed")
         # what just happened, how did it happen?
              
-    async def initialize(self,timeout):
-        await self.controller.enable_v1_api()
-        await self.controller.get_bridge_co_app_version()
-        #await self.controller.set_heartbeat_timout(timeout)
-
     async def on(self):
         await self.controller.nvm.send_command('SETSTANDBY OFF')
         await asyncio.sleep(3)
