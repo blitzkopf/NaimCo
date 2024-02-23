@@ -34,7 +34,7 @@ Basic stuff like volume up down and play some media works.
 But there are functions that as far as I can tell can't be controlled with upnp/DLNA such as:
 
 - On/Off ( Standby off or standby on í Naim terms )
-- Input selection 
+- Input selection
     - iRadio
     - Digital
     - Analog
@@ -45,4 +45,4 @@ Naim does not publish an API for the Mu-so, but there is an App. So after 5 year
 Communication
 -------------
 
-Some information found here: `Sniffing <api_sniffing/sniffing.md>`_
+Some information found here: `Sniffing <api_sniffing/sniffing.rst>`_
