@@ -2,7 +2,7 @@ import logging
 import base64
 import shlex
 import time
-import asyncio 
+import asyncio
 
 from .connection import Connection
 from .msg_processing import MessageStreamProcessor,gen_xml_command
@@ -11,13 +11,13 @@ _LOG = logging.getLogger(__name__)
 
 class Controller:
     """Controller communicates with the Mu-so device through the Connection class.
-    
+
     It encodes commands for the controller as XML.
 
-    It reads incoming replies from from the Connections and parses them and 
+    It reads incoming replies from from the Connections and parses them and
     decides what to do with them.
 
-    For each expected reply/event name there is a class method that gets 
+    For each expected reply/event name there is a class method that gets
     called when we get a xml using that name
 
     """
@@ -30,31 +30,31 @@ class Controller:
         self.last_send_time=None
 
     async def connect(self):
-        """Opens the Connection to device 
+        """Opens the Connection to device
         """
         # TODO: deal with connection failures and dropped connections
         self.connection=await Connection.create_connection(self.naimco.ip_address)
 
     async def initialize(self):
         """Initializes the controller
-        
+
         Sends the initial commands to the Mu-so device to get the initial state.
         """
         await self.enable_v1_api()
         await self.get_bridge_co_app_version()
-    
+
     async def startup(self):
         """Starts up the controller
-        
+
         Connects to the Mu-so device and initializes the controller.
         """
         await self.connect()
         await self.initialize()
-    
+
     async def receiver(self):
         """Coroutine that reads incoming stream from Connection
-        
-        Reads the stream of strings from Connections and assembles them 
+
+        Reads the stream of strings from Connections and assembles them
         together and splits them into seperate XML snippets.
 
         The incoming stream of data is not split on event/reply boundaries
@@ -80,17 +80,17 @@ class Controller:
                     self.process(tag,dict)
             else:
                 print('.',end="")
-    
+
     async def keep_alive(self,timeout):
         """Set timeout and keep the connection alive
 
         The Mu-so device will terminate the TCP socket if it does not receive
-        anything for a specific time. 
-        This coroutine sets the timout value in the Mu-so device and then 
-        sets a timer to send a ping if we are within a second of reaching 
+        anything for a specific time.
+        This coroutine sets the timout value in the Mu-so device and then
+        sets a timer to send a ping if we are within a second of reaching
         the time limit.
         Should be started as a seperate asyncio task.
-        
+
         Parameters
         ----------
         timeout : int
@@ -110,7 +110,7 @@ class Controller:
         """Process each incoming XML message
 
         Calls a method with the name of the XML reply, prefixed with '_'.
-        
+
         Parameters
         ----------
         tag : str
@@ -129,16 +129,16 @@ class Controller:
             method = getattr(self.__class__,'_'+key,None)
             if method:
                 method(self,val,id)
-            else: 
+            else:
                 _LOG.warn(f'Unhandled XML message {key} data:{data}')
-                
-    def _TunnelFromHost(self,val,id):
-        """Process data from NVM 
 
-        It looks there is a second controller module taking care of some 
+    def _TunnelFromHost(self,val,id):
+        """Process data from NVM
+
+        It looks there is a second controller module taking care of some
         basic functions of the player. It uses commands and replies encoded
         in base64.
-        This will collect messages from that unit and have a subcrontroller 
+        This will collect messages from that unit and have a subcrontroller
         called  NVMController take care of processing them.
 
         Parameters
@@ -151,27 +151,27 @@ class Controller:
 
     def _TunnelToHost(self,val,id):
         """As a reply this is just an empty reply, do nothing"""
-        pass 
+        pass
     def _GetViewState(self,val,id):
         """Respond to GetViewState replies/events
-         
+
         Register the current ViewState in a NaimCo device object
         """
         self.naimco.state.set_view_state(val['state'])
-    
+
     def _GetNowPlaying(self,val,id):
         """Respond to GetNowPlaying events/replies
-        
+
         Register the now playing data in the NaimCo device object.
         Mu-so will both send these as replies when commanded and as events when
         changing tracks.
         """
         _LOG.debug(f"GetNowPlaying: {val}")
         self.naimco.state.set_now_playing(val)
-    
+
     def _GetActiveList(self,val,id):
         """Respond to GetActiveList events/replies
-        
+
         I have yet to figure out how this work, keeping track of it in the
         device state for now.
         """
@@ -179,16 +179,16 @@ class Controller:
 
     def _Ping(self,val,id):
         """Respond to Ping replies
-        
+
         Just do nothing keep the connection open
         """
         pass
 
     def _GetNowPlayingTime(self,val,id):
         """Respond to GetNowPlaying time
-        
+
         Store the time which is in seconds in the device state.
-        
+
         Parameters
         ----------
         val : dict
@@ -211,10 +211,10 @@ class Controller:
         cmd = gen_xml_command(command,f"{self.cmd_id_seq}",payload)
         self.last_send_time = time.monotonic()
         await self.connection.send(cmd)
-    
+
     async def enable_v1_api(self):
         """Enable version 1 of naim API
-        
+
         This has to happen to enable the NVM commands
         """
         await self.send_command('RequestAPIVersion',
@@ -224,10 +224,10 @@ class Controller:
 
     async def get_bridge_co_app_version(self):
         await self.send_command('GetBridgeCoAppVersions')
-    
+
     async def get_now_playing(self):
         await self.send_command('GetNowPlaying')
-        
+
     async def set_heartbeat_timout(self,timeout):
         self.timeout_interval=timeout
         await self.send_command('SetHeartbeatTimeout',
@@ -235,9 +235,9 @@ class Controller:
         )
 def nanone(value:str)->str|None:
     """Handle NA string in value
-    
+
     Returns None if value is NA, value otherwise """
-    return None if value==None else value
+    return None if value is None else value
 
 class NVMController:
     def __init__(self,controller):
@@ -264,10 +264,10 @@ class NVMController:
             self.process_msg(part)
         self.buffer=parts[-1]
         _LOG.debug(f"NVM buffer {self.buffer}")
-        
+
     def process_msg(self,msg):
         tokens=shlex.split(msg)
-        nvm = tokens.pop(0)
+        tokens.pop(0) # #NVM token
         event = tokens.pop(0)
         event = event.replace(':','_')
         event = event.replace('-','minus')
@@ -275,18 +275,19 @@ class NVMController:
         method = getattr(self.__class__,'_'+event,None)
         if method:
             method(self,tokens)
-        else: 
+        else:
             _LOG.warn(f'Unhandled message from NVM {msg}')
-            
+
     def _GOTOPRESET(self,tokens):
         _LOG.debug(f"Playing iRadio preset number {tokens[0]} {tokens[1]}")
-    
+
     def _PREAMP(self,tokens):
         # #NVM PREAMP 2 0 0 IRADIO OFF OFF OFF ON "iRadio" OFF
         volume = tokens[0]
         input = tokens[3]
-        mute = tokens[4]
-        input_label = tokens[8]
+        # Maybe do something with the rest of the tokens?
+        #mute = tokens[4]
+        #input_label = tokens[8]
         self.state.volume=volume
         self.state.input=input
 
@@ -331,21 +332,21 @@ class NVMController:
         # #NVM ERROR: [11] Command not allowed in current system configuration
         match tokens[0]:
             case '[11]':
-                _LOG.debug(f'Error 11 received, usually something trivial')
+                _LOG.debug('Error 11 received, usually something trivial')
             case _:
-                _LOG.warn(f'Error from NVM:'+' '.join(tokens))
-    
+                _LOG.warn('Error from NVM:'+' '.join(tokens))
+
     def _GETBRIEFNP(self,tokens):
         # #NVM GETBRIEFNP PLAY "Rás 2 RÚV 90.1 FM" "http://http.cdnlayer.com/vt/logo/logo-1318.jpg" NA NA NA
         state = nanone(tokens[0])
         description = nanone(tokens[1])
         logo_url = nanone(tokens[2])
         self.state.briefnp = {'state':state,'description':description,'logo_url':logo_url}
-    
+
     def _GETBUFFERSTATE(self,tokens):
         # #NVM GETBUFFERSTATE 0
         self.state.bufferstate=tokens[0]
-    
+
     def _ALARMSTATE(self,tokens):
         # #NVM ALARMSTATE TIME_ADJUST
         # Don't know what this is seems to happen every minute on the minute
@@ -355,7 +356,7 @@ class NVMController:
         #NVM SETINPUT OK
         if tokens[0] != 'OK':
             _LOG.warn(f"SETINPUT reports {tokens[0]}")
-    
+
     def _GETINPUTBLK(self,tokens:list[str]):
         #NVM GETINPUTBLK 1 10 1 IRADIO "iRadio"
         #NVM GETINPUTBLK 2 10 1 MULTIROOM "Multiroom"
@@ -369,10 +370,10 @@ class NVMController:
         state = tokens[0]
         type = tokens[1]
         self.state.standbystatus = {'state':state,'type':type}
-    
+
     def _PONG(self,tokens):
         pass
-    
+
     def _GETVIEWMESSAGE(self,tokens):
         #NVM GETVIEWMESSAGE SKIPFILE
         pass
@@ -381,7 +382,7 @@ class NVMController:
         #NVM PLAY OK
         if tokens[0] != 'OK':
             _LOG.warn(f"PLAY reports {tokens[0]}")
-    
+
     def _PRODUCT(self,tokens):
         #NVM PRODUCT MUSO
         self.state.product=tokens[0]
@@ -389,22 +390,22 @@ class NVMController:
     def _GETSERIALNUM(self,tokens):
         #NVM GETSERIALNUM 1107010284
         self.state.serialnum=tokens[0]
-    
+
     def _GETROOMNAME(self,tokens):
         #NVM GETROOMNAME "Livingroom"
         self.state.roomname=tokens[0]
-    
+
     def _GETTOTALPRESETS(self,tokens):
         #NVM GETTOTALPRESETS 40
         self.state.totalpresets=tokens[0]
         ## do this her while we don't have any event processing or waiting for response
         asyncio.create_task(self.send_command(f"GETPRESETBLK 1 {tokens[0]}"))
-    
+
     def _GETPRESETBLK(self,tokens:list[str]):
         #NVM GETPRESETBLK 1 40 USED "Rás 1 RÚV 93.5 FM" INTERNET 0 NONE NORMAL
         #NVM GETPRESETBLK 2 40 USED "Rás 2 RÚV 90.1 FM" INTERNET 0 NONE NORMAL
         index:int =int(tokens[0])
-        max:int = int(tokens[1])
+        #max:int = int(tokens[1])
         state:str = tokens[2]
         name:str = tokens[3]
         transport:str = tokens[4]

@@ -89,10 +89,10 @@ class NaimCo:
         await self.controller.nvm.send_command(f'SETRVOL {volume}')
 
     async def volume_up(self):
-        await self.controller.nvm.send_command(f'VOL+')
+        await self.controller.nvm.send_command('VOL+')
 
     async def volume_down(self):
-        await self.controller.nvm.send_command(f'VOL-')
+        await self.controller.nvm.send_command('VOL-')
     
     @property
     def input(self):
@@ -189,9 +189,9 @@ class NaimCo:
             else:
                 resp['string'] = f'{resp.get("artist")} / {resp.get("title")} / {resp.get("album")}' 
 
-        except Exception as e:            
+        except Exception:            
             #_LOG.debug(f"failed to make string {resp} {e}")
-            resp['string'] = f'No information available' 
+            resp['string'] = 'No information available' 
         return resp
 
 class NaimState:
