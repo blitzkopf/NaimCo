@@ -7,17 +7,23 @@ readme = "README.rst"
 license = "MIT"
 homepage = "https://github.com/blitzkopf/NaimCo"
 repository = "https://github.com/blitzkopf/NaimCo"
-keywords = ["naim", "mu-so",  "homeassistant"]
+keywords = ["naim", "mu-so", "homeassistant"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Topic :: Home Automation",
     "Topic :: Multimedia :: Sound/Audio :: Players",
-    ]
+]
 
 [tool.poetry.dependencies]
-python = "^3.5"
+python = "^3.11"
 asyncio = "^3.4.3"
+ruff = "^0.3.4"
+logging = "^0.4.9.6"
+argparse = "^1.4.0"
 
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.7.0"
 
 [build-system]
 requires = ["poetry-core"]
