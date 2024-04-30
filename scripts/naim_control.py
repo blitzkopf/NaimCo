@@ -28,7 +28,7 @@ _LOG = logging.getLogger(__name__)
 
 async def control(device, args):
     """Send commands to Mu-so runs as asyncio task"""
-    await device.initialize(10)
+    # await device.initialize(10)
     if args.preset:
         _LOG.info(f"Turning on radio preset {args.preset}")
         await device.select_preset(args.preset)
@@ -80,12 +80,18 @@ async def main():
     device = NaimCo(args.address)
     # await naim.connect_api()
     await device.startup()
-    async with asyncio.TaskGroup() as tg:
-        tg.create_task(device.run_connection())
-        tg.create_task(control(device, args))
-    _LOG.info("Both tasks have completed now.")
+    # async with asyncio.TaskGroup() as tg:
+    #    task1 = tg.create_task(device.run_connection())
+    #    task2 = tg.create_task(control(device,args))
+    await control(device, args)
+    # _LOG.info("Both tasks have completed now.")
+    await asyncio.sleep(1)
+
     _LOG.info(f"View State: {device.state.view_state} ")
     _LOG.info(f"Now Playing: {device.state.now_playing} ")
+    _LOG.info(f"NVM VIEWSTATE: {device.state._viewstate} ")
+
+    await device.shutdown()
 
 
 if __name__ == "__main__":
