@@ -52,7 +52,7 @@ async def control(device, args):
     # await device.controller.send_command('GetActiveList')
 
 
-async def main():
+def main():
     """Take care of parse cmdline and start communicating with Mu-so."""
     # create an ArgumentParser object
     parser = argparse.ArgumentParser(description="Turn on Radio on naim Mu-so")
@@ -77,6 +77,10 @@ async def main():
     )
     parser.add_argument("address", type=str, help="ip address of Mu-so")
     args = parser.parse_args()
+    asyncio.run(run(args))
+
+
+async def run(args):
     device = NaimCo(args.address)
     # await naim.connect_api()
     await device.startup()
@@ -96,6 +100,6 @@ async def main():
 
 if __name__ == "__main__":
     start = time.time()
-    asyncio.run(main())
+    main()
     end = time.time()
     print(end - start)
