@@ -31,6 +31,7 @@ class Connection:
         Connection
             a connection object that has opened a TCP connection to device.
         """
+        _LOG.debug("Connecting to  Naim Mu-So on ip: %s", ip_address)
 
         reader, writer = await asyncio.open_connection(ip_address, socket_api_port)
         conn = Connection(reader, writer)

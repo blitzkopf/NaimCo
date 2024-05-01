@@ -13,6 +13,7 @@ _LOG = logging.getLogger(__name__)
 class Controller:
     """Controller communicates with the Mu-so device through the Connection class.
 
+
     It encodes commands for the controller as XML.
 
     It reads incoming replies from from the Connections and parses them and
@@ -30,6 +31,7 @@ class Controller:
         self.nvm = NVMController(self)
         self.timeout_interval = None
         self.last_send_time = None
+        self.keep_connection_alive: bool = None
 
     async def connect(self):
         """Opens the Connection to device"""
@@ -44,15 +46,30 @@ class Controller:
         await self.enable_v1_api()
         await self.get_bridge_co_app_version()
 
-    async def startup(self):
+    async def startup(self, timeout=None):
         """Starts up the controller
 
         Connects to the Mu-so device and initializes the controller.
         """
-        await self.connect()
-        await self.initialize()
+        _LOG.info("Starting up controller")
+        self.keep_connection_alive = True
+        self.connection_task = asyncio.create_task(self.connection_runner())
+        # FIXME : this sleep is a hack to get the connection up and running before we start sending commands
+        await asyncio.sleep(0.1)
+        if timeout:
+            self.keep_alive_task = asyncio.create_task(self.keep_alive(timeout))
 
-    async def receiver(self):
+    async def shutdown(self):
+        """Shuts down the controller
+
+        Stops the connection runner and closes the connection.
+        """
+        self.keep_connection_alive = False
+        await self.connection.close()
+        if self.connection_task:
+            await self.connection_task
+
+    async def connection_runner(self):
         """Coroutine that reads incoming stream from Connection
 
         Reads the stream of strings from Connections and assembles them
@@ -65,22 +82,30 @@ class Controller:
         Calls process for each XML extracted.
 
         """
+        await self.connect()
+        await self.initialize()
         parser = MessageStreamProcessor()
         # what happens if msgs are split on non char boundaries?
-        while True:
+        while self.keep_connection_alive:
             try:
                 data = await self.connection.receive()
+                if len(data) > 0:
+                    _LOG.debug(f"Received: {data!r}")
+                    parser.feed(data)
+                    for tag, dict in parser.read_messages():
+                        self.process(tag, dict)
+                else:
+                    print(".", end="")
             except ConnectionAbortedError as e:
                 # TODO:deal with connection failures and dropped connections
-                _LOG.error(f"Connection aborted: {e}")
-                return
-            if len(data) > 0:
-                _LOG.debug(f"Received: {data!r}")
-                parser.feed(data)
-                for tag, dict in parser.read_messages():
-                    self.process(tag, dict)
-            else:
-                print(".", end="")
+                if self.keep_connection_alive:
+                    _LOG.error(f"Connection aborted, reconnecting: {e}")
+                    await self.connect()
+                    await self.initialize()
+                    parser = MessageStreamProcessor()
+                else:
+                    _LOG.error(f"Connection aborted, not reconnecting: {e}")
+                    return
 
     async def keep_alive(self, timeout):
         """Set timeout and keep the connection alive
@@ -161,6 +186,21 @@ class Controller:
         """
         self.naimco.state.set_view_state(val["state"])
 
+    def _RequestAPIVersion(self, val, id):
+        """Respond to RequestAPIVersion requests
+
+        Don't do anything just hope it works
+        """
+        None
+
+    def _GetBridgeCoAppVersions(self, val, id):
+        """Respond to GetBridgeCoAppVersions replies
+
+
+        Register the bridge co app versions in the NaimCo device object.
+        """
+        self.naimco.state.set_bridge_co_app_versions(val)
+
     def _GetNowPlaying(self, val, id):
         """Respond to GetNowPlaying events/replies
 
@@ -174,6 +214,7 @@ class Controller:
     def _GetActiveList(self, val, id):
         """Respond to GetActiveList events/replies
 
+
         I have yet to figure out how this work, keeping track of it in the
         device state for now.
         """
@@ -182,6 +223,7 @@ class Controller:
     def _Ping(self, val, id):
         """Respond to Ping replies
 
+
         Just do nothing keep the connection open
         """
         pass
@@ -189,7 +231,9 @@ class Controller:
     def _GetNowPlayingTime(self, val, id):
         """Respond to GetNowPlaying time
 
+
         Store the time which is in seconds in the device state.
+
 
         Parameters
         ----------
@@ -216,6 +260,7 @@ class Controller:
 
     async def enable_v1_api(self):
         """Enable version 1 of naim API
+
 
         This has to happen to enable the NVM commands
         """

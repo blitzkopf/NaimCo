@@ -11,6 +11,7 @@ class NaimCo:
     """The main class for interacting with a Naim Mu-so device.
 
     This is the class that the "end user" will interact with.
+    This is the class that the "end user" will interact with.
     """
 
     def __init__(self, ip_address):
@@ -41,7 +42,7 @@ class NaimCo:
         self.version = None
         _LOG.debug("Created NaimCo instance for ip: %s", ip_address)
 
-    async def startup(self):
+    async def startup(self, timeout=None):
         """Connect to the Mu-so device and get the initial state.
 
         This method should be called before any other interaction with the device.
@@ -50,26 +51,11 @@ class NaimCo:
         # and before any other interaction with the device is attempted.
         _LOG.debug("Starting up NaimCo instance for ip: %s", self.ip_address)
         self.controller = Controller(self)
-        await self.controller.startup()
+        await self.controller.startup(timeout)
 
-    async def run_connection(self, timeout=None):
-        """Run a connection to the Mu-so device.
-
-        This method is a convenience method that calls `startup()`, `connect()` and `shutdown()` in sequence.
-
-        Parameters
-        ----------
-        timeout : int, optional
-            timeout in seconds for the `keep_alive()` method. If `None` then no keep alive is sent.
-        """
-        # await self.connect()
-
-        asyncio.create_task(self.controller.receiver())
-        if timeout:
-            await self.controller.keep_alive(timeout)
-
-        _LOG.warn("Connection to naim closed")
-        # what just happened, how did it happen?
+    async def shutdown(self):
+        """Close the connection to the Mu-so device."""
+        await self.controller.shutdown()
 
     async def on(self):
         await self.controller.nvm.send_command("SETSTANDBY OFF")
@@ -219,6 +205,7 @@ class NaimState:
         self.now_playing = None
         self.now_playing_time = None
         self.active_list = None
+        self.bridge_co_app_versions = None
 
     @property
     def volume(self) -> int:
@@ -330,3 +317,6 @@ class NaimState:
 
     def set_now_playing_time(self, state):
         self.now_playing_time = state
+
+    def set_bridge_co_app_versions(self, state):
+        self.bridge_co_app_versions = state
