@@ -17,7 +17,6 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.11"
 asyncio = "^3.4.3"
-logging = "^0.4.9.6"
 argparse = "^1.4.0"
 
 [tool.poetry.scripts]
