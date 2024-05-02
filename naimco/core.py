@@ -99,6 +99,10 @@ class NaimCo:
         return self.state.roomname
 
     @property
+    def name(self):
+        return self.state.roomname
+
+    @property
     def inputs(self) -> dict[int, dict]:
         return {inp["id"]: inp["name"] for inp in self.state.inputblk.values()}
 
