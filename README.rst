@@ -3,10 +3,12 @@ NaimCo
 ======
 NaimCo (NaimController) is package to control Naim Mu-so sound systems.
 
+The main purpose of this package integration with Home Assistant.
+
 Nothing much to see for the moment but you can turn on the radio to preset #2:
 ::
-  
-  $ python scripts/naim_control.py 192.168.1.183 --preset 2 --volume 10
+
+  $ naim_control 192.168.1.183 --preset 2 --volume 10
 
   usage: naim_control.py [-h] [-i {IRADIO,DIGITAL1,SPOTIFY,USB,UPNP,TIDAL,FRONT} | -p PRESET | -o] [-v VOLUME] address
 
@@ -28,7 +30,7 @@ Nothing much to see for the moment but you can turn on the radio to preset #2:
 Motivation
 ----------
 
-Naim Mu-so implements DLNA to some extent and it is possible to control it in home automation systems. 
+Naim Mu-so implements DLNA to some extent and it is possible to control it in home automation systems.
 Basic stuff like volume up down and play some media works.
 
 But there are functions that as far as I can tell can't be controlled with upnp/DLNA such as:
