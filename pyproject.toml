@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "naimco"
-version = "0.1.1"
+version = "0.1.2"
 description = "Package to control Naim Mu-so sound systems"
 authors = ["Yngvi Þór Sigurjónsson <blitzkopf@gmail.com>"]
 readme = "README.rst"
