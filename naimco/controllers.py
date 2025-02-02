@@ -35,7 +35,6 @@ class Controller:
 
     async def connect(self):
         """Opens the Connection to device"""
-        # TODO: deal with connection failures and dropped connections
         self.connection = await Connection.create_connection(self.naimco.ip_address)
 
     async def initialize(self):
@@ -54,12 +53,6 @@ class Controller:
         _LOG.info("Starting up controller")
         self.keep_connection_alive = True
         await self.connect()
-        # await self.initialize()
-        # self.connection_task = asyncio.create_task(self.connection_runner())
-        # FIXME : this sleep is a hack to get the connection up and running before we start sending commands
-        # await asyncio.sleep(0.1)
-        # if timeout:
-        #    self.keep_alive_task = asyncio.create_task(self.keep_alive(timeout))
 
     async def shutdown(self):
         """Shuts down the controller
@@ -68,8 +61,6 @@ class Controller:
         """
         self.keep_connection_alive = False
         await self.connection.close()
-        # if self.connection_task:
-        #     await self.connection_task
 
     async def connection_runner(self):
         """Coroutine that reads incoming stream from Connection
@@ -88,7 +79,6 @@ class Controller:
         parser = MessageStreamProcessor()
         # what happens if msgs are split on non char boundaries?
         while self.keep_connection_alive:
-            # try:
             data = await self.connection.receive()
             if len(data) > 0:
                 _LOG.debug(f"Received: {data!r}")
@@ -97,16 +87,6 @@ class Controller:
                     self.process(tag, dict)
             else:
                 print(".", end="")
-            # except ConnectionAbortedError as e:
-            #     # TODO:deal with connection failures and dropped connections
-            #     if self.keep_connection_alive:
-            #         _LOG.error(f"Connection aborted, reconnecting: {e}")
-            #         await self.connect()
-            #         await self.initialize()
-            #         parser = MessageStreamProcessor()
-            #     else:
-            #         _LOG.error(f"Connection aborted, not reconnecting: {e}")
-            #         return
 
     async def keep_alive(self, timeout):
         """Set timeout and keep the connection alive
