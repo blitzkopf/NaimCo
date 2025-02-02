@@ -42,7 +42,7 @@ class NaimCo:
         self.version = None
         _LOG.debug("Created NaimCo instance for ip: %s", ip_address)
 
-    async def startup(self, timeout=None):
+    async def startup(self):
         """Connect to the Mu-so device and get the initial state.
 
         This method should be called before any other interaction with the device.
@@ -51,7 +51,23 @@ class NaimCo:
         # and before any other interaction with the device is attempted.
         _LOG.debug("Starting up NaimCo instance for ip: %s", self.ip_address)
         self.controller = Controller(self)
-        await self.controller.startup(timeout)
+        await self.controller.startup()
+
+    async def runner_task(self):
+        """Coroutine that need to run in seperate task to take care of reading data from
+        the Mu-so device
+        """
+        await self.controller.connection_runner()
+
+    async def initialize(self, timeout=None):
+        """Initialize the device so it is ready to accept commands.
+
+        Optionally set timeout interval in seconds for Mu-so device, if Mu-so does not receive
+        a message in that interval it will disconnect.
+        """
+        await self.controller.initialize()
+        if timeout:
+            await self.controller.set_heartbeat_timout(timeout)
 
     async def shutdown(self):
         """Close the connection to the Mu-so device."""
