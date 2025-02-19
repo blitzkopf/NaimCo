@@ -74,10 +74,12 @@ def tree_to_dict(element):
                     val = []
                     for item in child:
                         if item.tag == "map":
+                            map = {}
                             for it2 in item:
                                 _LOG.debug(f"item: {ET.tostring(it2)}")
                                 subtag, d = tree_to_dict(it2)
-                                val.append(d)
+                                map.update(d)
+                            val.append(map)
                         else:
                             subtag, d = tree_to_dict(item)
                             val.append(d)

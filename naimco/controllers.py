@@ -31,7 +31,7 @@ class Controller:
         self.nvm = NVMController(self)
         self.timeout_interval = None
         self.last_send_time = None
-        self.keep_connection_alive: bool = None
+        self.connection = None
 
     async def connect(self):
         """Opens the Connection to device"""
@@ -51,7 +51,6 @@ class Controller:
         Connects to the Mu-so device and initializes the controller.
         """
         _LOG.info("Starting up controller")
-        self.keep_connection_alive = True
         await self.connect()
 
     async def shutdown(self):
@@ -59,8 +58,27 @@ class Controller:
 
         Stops the connection runner and closes the connection.
         """
-        self.keep_connection_alive = False
         await self.connection.close()
+
+    async def request_data_update(self):
+        await self.send_command("GetViewState")
+        await self.nvm.send_command("GETVIEWSTATE")
+        await self.nvm.send_command("GETPREAMP")
+        await self.nvm.send_command("GETBRIEFNP")
+        await self.nvm.send_command("GETSTANDBYSTATUS")
+        # Might need to be smarter about this if initial request failed partially
+        if len(self.naimco.state.inputblk) == 0:
+            await self.nvm.send_command("GETINPUTBLK")
+        if not self.naimco.state.product:
+            await self.nvm.send_command("PRODUCT")
+        if not self.naimco.state.serialnum:
+            await self.nvm.send_command("GETSERIALNUM")
+        if not self.naimco.state.roomname:
+            await self.nvm.send_command("GETROOMNAME")
+        if len(self.naimco.state.presetblk) == 0:
+            await self.nvm.send_command("GETTOTALPRESETS")
+
+        await self.send_command("GetNowPlaying")
 
     async def connection_runner(self):
         """Coroutine that reads incoming stream from Connection
@@ -78,7 +96,7 @@ class Controller:
 
         parser = MessageStreamProcessor()
         # what happens if msgs are split on non char boundaries?
-        while self.keep_connection_alive:
+        while True:
             data = await self.connection.receive()
             if len(data) > 0:
                 _LOG.debug(f"Received: {data!r}")
@@ -87,6 +105,7 @@ class Controller:
                     self.process(tag, dict)
             else:
                 print(".", end="")
+            await self.naimco._call_callback()
 
     async def keep_alive(self, timeout):
         """Set timeout and keep the connection alive
@@ -184,6 +203,13 @@ class Controller:
         """
         self.naimco.state.set_bridge_co_app_versions(val)
 
+    def _SetHeartbeatTimeout(self, val, id):
+        """Respond to RequestAPIVersion requests
+
+        Don't do anything just hope it works
+        """
+        None
+
     def _GetNowPlaying(self, val, id):
         """Respond to GetNowPlaying events/replies
 
@@ -194,6 +220,15 @@ class Controller:
         _LOG.debug(f"GetNowPlaying: {val}")
         self.naimco.state.set_now_playing(val)
 
+    def _GetVolume(self, val, id):
+        """Respond to GetVolume events/replies
+
+        We don't ask for this we use *PREAMP instead but sometimes we get it anyway.
+        Might as well keep track of it.
+        """
+        _LOG.debug(f"GetVolume: {val}")
+        self.naimco.state.volume = val["volume"]
+
     def _GetActiveList(self, val, id):
         """Respond to GetActiveList events/replies
 
@@ -202,6 +237,9 @@ class Controller:
         device state for now.
         """
         self.naimco.state.set_active_list(val)
+
+    def _GetRows(self, val, id):
+        self.naimco.state.set_rows(val)
 
     def _Ping(self, val, id):
         """Respond to Ping replies
@@ -239,6 +277,7 @@ class Controller:
         self.cmd_id_seq += 1
         cmd = gen_xml_command(command, f"{self.cmd_id_seq}", payload)
         self.last_send_time = time.monotonic()
+        _LOG.debug(f"Sending {cmd}")
         await self.connection.send(cmd)
 
     async def enable_v1_api(self):
@@ -268,11 +307,11 @@ class Controller:
         )
 
 
-def nanone(value: str) -> str | None:
+def na2none(value: str) -> str | None:
     """Handle NA string in value
 
     Returns None if value is NA, value otherwise"""
-    return None if value is None else value
+    return None if value == "NA" else value
 
 
 class NVMController:
@@ -303,8 +342,8 @@ class NVMController:
         await self.send_command("PING")
 
     def assemble_msgs(self, string):
-        ## incoming XML messages can both contain many NVM events and partial so we have to assamble them
-        ## messages seem to start with # and be terminted with Carriege Return (\r)
+        # incoming XML messages can both contain many NVM events and partial so we have to assamble them
+        # messages seem to start with # and be terminted with Carriege Return (\r)
         unpr_msg = self.buffer + string
         parts = unpr_msg.split("\r\n")
         for part in parts[0:-1]:
@@ -367,12 +406,12 @@ class NVMController:
         # #NVM GETVIEWSTATE PLAYING CONNECTING 2 N N NA IRADIO "Rás2RÚV901" "Rás 2 RÚV 90.1 FM" NA NA
         # #NVM GETVIEWSTATE PLAYING ANALYSING NA N N NA SPOTIFY NA NA NA NA
         # There is also GetViewState XML Event
-        state = nanone(tokens[0])
-        phase = nanone(tokens[1])
-        preset = nanone(tokens[2])
-        input = nanone(tokens[6])
-        compact_name = nanone(tokens[7])
-        fullname = nanone(tokens[9])
+        state = na2none(tokens[0])
+        phase = na2none(tokens[1])
+        preset = na2none(tokens[2])
+        input = na2none(tokens[6])
+        compact_name = na2none(tokens[7])
+        fullname = na2none(tokens[9])
         self.state.viewstate = {
             "state": state,
             "phase": phase,
@@ -392,9 +431,10 @@ class NVMController:
 
     def _GETBRIEFNP(self, tokens):
         # #NVM GETBRIEFNP PLAY "Rás 2 RÚV 90.1 FM" "http://http.cdnlayer.com/vt/logo/logo-1318.jpg" NA NA NA
-        state = nanone(tokens[0])
-        description = nanone(tokens[1])
-        logo_url = nanone(tokens[2])
+        state = na2none(tokens[0])
+        description = na2none(tokens[1])
+        logo_url = na2none(tokens[2])
+        _LOG.debug(f"GETBRIEFNP {state} {description} >{logo_url}<")
         self.state.briefnp = {
             "state": state,
             "description": description,
@@ -456,7 +496,7 @@ class NVMController:
     def _GETTOTALPRESETS(self, tokens):
         # NVM GETTOTALPRESETS 40
         self.state.totalpresets = tokens[0]
-        ## do this her while we don't have any event processing or waiting for response
+        # do this her while we don't have any event processing or waiting for response
         asyncio.create_task(self.send_command(f"GETPRESETBLK 1 {tokens[0]}"))
 
     def _GETPRESETBLK(self, tokens: list[str]):
