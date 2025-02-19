@@ -11,10 +11,9 @@ class NaimCo:
     """The main class for interacting with a Naim Mu-so device.
 
     This is the class that the "end user" will interact with.
-    This is the class that the "end user" will interact with.
     """
 
-    def __init__(self, ip_address):
+    def __init__(self, ip_address, callback=None):
         """Initialize a NaimCo instance.
 
         Parameters
@@ -38,11 +37,13 @@ class NaimCo:
         self.ip_address = ip_address
         self.cmd_id = 0
         self.state = NaimState()
+        self.last_scn = self.state.scn
         self.controller = None
         self.version = None
+        self.callback = callback
         _LOG.debug("Created NaimCo instance for ip: %s", ip_address)
 
-    async def startup(self):
+    async def startup(self, timeout=None):
         """Connect to the Mu-so device and get the initial state.
 
         This method should be called before any other interaction with the device.
@@ -50,14 +51,52 @@ class NaimCo:
         # Note: This method should be called after the event loop is running
         # and before any other interaction with the device is attempted.
         _LOG.debug("Starting up NaimCo instance for ip: %s", self.ip_address)
-        self.controller = Controller(self)
-        await self.controller.startup()
+        self._tasks = asyncio.create_task(self.run_tasks(timeout))
+
+    async def update_data(self):
+        if self.controller:
+            _LOG.info("Requesting data update")
+            await self.controller.request_data_update()
+            return True
+        _LOG.error("No controller to update data")
+
+        return False
 
     async def runner_task(self):
         """Coroutine that need to run in seperate task to take care of reading data from
         the Mu-so device
         """
         await self.controller.connection_runner()
+
+    async def run_tasks(self, interval: int):
+        """Run tasks in parallel."""
+        reconnect_backoff_time = 10
+        while True:
+            self.controller = Controller(self)
+            try:
+                await self.controller.connect()
+                await self.initialize(interval)
+            except Exception as e:
+                _LOG.error(f"Failed to connect to controller {e}")
+                await asyncio.sleep(reconnect_backoff_time)
+                reconnect_backoff_time += 10
+                reconnect_backoff_time = min(reconnect_backoff_time, 120)
+                continue
+            reconnect_backoff_time = 10
+            try:
+                async with asyncio.TaskGroup() as tg:
+                    tg.create_task(self.runner_task())
+                    tg.create_task(self.controller.keep_alive(interval))
+                    await self.controller.request_data_update()
+            except* Exception as e:
+                _LOG.info(f"Tasks failed! {e.exceptions}")
+                try:
+                    await self.controller.shutdown()
+                except Exception as e:
+                    _LOG.error(f"Failed to shutdown controller {e}")
+                finally:
+                    self.controller = None
+                # await self._device_disconnect()
 
     async def initialize(self, timeout=None):
         """Initialize the device so it is ready to accept commands.
@@ -71,7 +110,16 @@ class NaimCo:
 
     async def shutdown(self):
         """Close the connection to the Mu-so device."""
+        if self._tasks:
+            await self._tasks.cancel()
         await self.controller.shutdown()
+
+    async def _call_callback(self):
+        """Call the callback function if it is set and state.scn has changed"""
+        if self.callback and self.state.scn != self.last_scn:
+            _LOG.debug("Calling callback %s", self.callback)
+            self.last_scn = self.state.scn
+            await self.callback(self.state)
 
     async def on(self):
         await self.controller.nvm.send_command("SETSTANDBY OFF")
@@ -192,10 +240,10 @@ class NaimCo:
             pass
         try:
             if resp["source"] == "iradio":
-                resp["string"] = f'{resp.get("artist")} {resp.get("title")}'
+                resp["string"] = f"{resp.get('artist')} {resp.get('title')}"
             else:
                 resp["string"] = (
-                    f'{resp.get("artist")} / {resp.get("title")} / {resp.get("album")}'
+                    f"{resp.get('artist')} / {resp.get('title')} / {resp.get('album')}"
                 )
 
         except Exception:
@@ -206,6 +254,8 @@ class NaimCo:
 
 class NaimState:
     def __init__(self):
+        # Sequence number, increment to send new state to HA
+        self.scn = int(0)
         # NVM properties
         self._input: str = None
         self._volume: int = None
@@ -225,7 +275,11 @@ class NaimState:
         self.now_playing = None
         self.now_playing_time = None
         self.active_list = None
+        self.rows = None
         self.bridge_co_app_versions = None
+
+    def inc_scn(self):
+        self.scn += 1
 
     @property
     def volume(self) -> int:
@@ -233,7 +287,9 @@ class NaimState:
 
     @volume.setter
     def volume(self, volume: int):
-        self._volume = volume
+        if volume != self._volume:
+            self._volume = volume
+            self.inc_scn()
 
     @property
     def input(self) -> str:
@@ -241,7 +297,9 @@ class NaimState:
 
     @input.setter
     def input(self, input: str):
-        self._input = input
+        if input != self._input:
+            self._input = input
+            self.inc_scn()
 
     @property
     def viewstate(self) -> dict:
@@ -250,7 +308,9 @@ class NaimState:
     @viewstate.setter
     def viewstate(self, state: dict):
         """NVM view state"""
-        self._viewstate = state
+        if state != self._viewstate:
+            self._viewstate = state
+            self.inc_scn()
 
     @property
     def briefnp(self) -> dict:
@@ -258,7 +318,9 @@ class NaimState:
 
     @briefnp.setter
     def briefnp(self, briefnp):
-        self._briefnp = briefnp
+        if briefnp != self._briefnp:
+            self._briefnp = briefnp
+            self.inc_scn()
 
     @property
     def bufferstate(self) -> int:
@@ -274,7 +336,9 @@ class NaimState:
 
     @standbystatus.setter
     def standbystatus(self, standbystatus: dict):
-        self._standbystatus = standbystatus
+        if standbystatus != self._standbystatus:
+            self._standbystatus = standbystatus
+            self.inc_scn()
 
     @property
     def inputblk(self) -> list[dict]:
@@ -330,13 +394,20 @@ class NaimState:
         self.view_state = state
 
     def set_now_playing(self, state):
-        self.now_playing = state
+        if self.now_playing != state:
+            self.now_playing = state
+            self.inc_scn()
 
     def set_active_list(self, state):
         self.active_list = state
 
+    def set_rows(self, state):
+        self.rows = state
+
     def set_now_playing_time(self, state):
-        self.now_playing_time = state
+        if self.now_playing_time != state:
+            self.now_playing_time = state
+            self.inc_scn()
 
     def set_bridge_co_app_versions(self, state):
         self.bridge_co_app_versions = state
