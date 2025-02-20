@@ -32,6 +32,7 @@ class Controller:
         self.timeout_interval = None
         self.last_send_time = None
         self.connection = None
+        self.wait_events = {}
 
     async def connect(self):
         """Opens the Connection to device"""
@@ -151,6 +152,10 @@ class Controller:
         if tag == "reply":
             id = data["id"]
             # is anyone waiting for an answer?
+            if id in self.wait_events:
+                _LOG.debug(f"Setting event for id {id}")
+                self.wait_events[id].set()
+
         for key, val in data.items():
             if key == "id":
                 continue
@@ -263,7 +268,7 @@ class Controller:
         """
         self.naimco.state.set_now_playing_time(val["play_time"])
 
-    async def send_command(self, command, payload=None):
+    async def send_command(self, command, payload=None, wait_for_reply_timeout=None):
         """Encodes a command as XML and send to Mu-so
 
         Parameter
@@ -275,10 +280,23 @@ class Controller:
 
         """
         self.cmd_id_seq += 1
-        cmd = gen_xml_command(command, f"{self.cmd_id_seq}", payload)
+        id = f"{self.cmd_id_seq}"
+        cmd = gen_xml_command(command, id, payload)
         self.last_send_time = time.monotonic()
         _LOG.debug(f"Sending {cmd}")
-        await self.connection.send(cmd)
+        if wait_for_reply_timeout:
+            event = asyncio.Event()
+            self.wait_events[id] = event
+            await self.connection.send(cmd)
+            _LOG.debug(f"Waiting for reply {id}")
+            try:
+                await asyncio.wait_for(event.wait(), wait_for_reply_timeout)
+                _LOG.debug(f"Reply received {id}")
+            except asyncio.TimeoutError:
+                _LOG.warn(f"Timeout waiting for reply {id}")
+            del self.wait_events[id]
+        else:
+            await self.connection.send(cmd)
 
     async def enable_v1_api(self):
         """Enable version 1 of naim API
@@ -320,7 +338,7 @@ class NVMController:
         self.buffer = ""
         self.state = controller.naimco.state
 
-    async def send_command(self, command):
+    async def send_command(self, command, wait_for_reply_timeout=None):
         cmd = f"*NVM {command}"
         _LOG.debug(f"Sending {cmd}")
         await self.controller.send_command(
@@ -336,6 +354,7 @@ class NVMController:
                     }
                 }
             ],
+            wait_for_reply_timeout=wait_for_reply_timeout,
         )
 
     async def ping(self):

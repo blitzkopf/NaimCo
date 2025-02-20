@@ -68,7 +68,7 @@ class NaimCo:
         """
         await self.controller.connection_runner()
 
-    async def run_tasks(self, interval: int):
+    async def run_tasks(self, interval: int | None):
         """Run tasks in parallel."""
         reconnect_backoff_time = 10
         while True:
@@ -86,7 +86,8 @@ class NaimCo:
             try:
                 async with asyncio.TaskGroup() as tg:
                     tg.create_task(self.runner_task())
-                    tg.create_task(self.controller.keep_alive(interval))
+                    if interval:
+                        tg.create_task(self.controller.keep_alive(interval))
                     await self.controller.request_data_update()
             except* Exception as e:
                 _LOG.info(f"Tasks failed! {e.exceptions}")
