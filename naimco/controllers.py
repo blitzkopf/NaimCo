@@ -45,6 +45,7 @@ class Controller:
         """
         await self.enable_v1_api()
         await self.get_bridge_co_app_version()
+        await self.nvm.send_command("SETUNSOLICITED ON")
 
     async def startup(self, timeout=None):
         """Starts up the controller
@@ -149,21 +150,31 @@ class Controller:
 
         """
         id = None
-        if tag == "reply":
-            id = data["id"]
-            # is anyone waiting for an answer?
-            if id in self.wait_events:
-                _LOG.debug(f"Setting event for id {id}")
-                self.wait_events[id].set()
-
-        for key, val in data.items():
-            if key == "id":
-                continue
-            method = getattr(self.__class__, "_" + key, None)
-            if method:
-                method(self, val, id)
+        if tag == "error":
+            id = data.get("id", None)
+            _LOG.debug(f"Error message {data}")
+            code = data.get("code", None)
+            if code in ("1"):
+                # Ignonre these 1 NotPlaying
+                _LOG.debug(f"Error from Mu-so 1 {data}")
             else:
-                _LOG.warn(f"Unhandled XML message {tag} {key} data:{data}")
+                _LOG.warn(f"Error from Mu-so {data}")
+        else:
+            if tag == "reply":
+                id = data["id"]
+
+            for key, val in data.items():
+                if key == "id":
+                    continue
+                method = getattr(self.__class__, "_" + key, None)
+                if method:
+                    method(self, val, id)
+                else:
+                    _LOG.warn(f"Unhandled XML message {tag} {key} data:{data}")
+        # is anyone waiting for an answer?
+        if id in self.wait_events:
+            _LOG.debug(f"Setting event for id {id}")
+            self.wait_events[id].set()
 
     def _TunnelFromHost(self, val, id):
         """Process data from NVM
@@ -392,10 +403,11 @@ class NVMController:
         volume = tokens[0]
         input = tokens[3]
         # Maybe do something with the rest of the tokens?
-        # mute = tokens[4]
+        mute = tokens[4]
         # input_label = tokens[8]
         self.state.volume = volume
         self.state.input = input
+        self.state.mute = mute == "ON"
 
         _LOG.debug(f"Volume set  {tokens[0]} {tokens[1]}")
 
@@ -418,6 +430,10 @@ class NVMController:
     def _SETRVOL(self, tokens):
         if tokens[0] != "OK":
             _LOG.warn(f"SETRVOL reports {tokens[0]}")
+
+    def _SETUNSOLICITED(self, tokens):
+        if tokens[0] != "OK":
+            _LOG.warn(f"SETUNSOLICITED reports {tokens[0]}")
 
     def _GETVIEWSTATE(self, tokens):
         # #NVM GETVIEWSTATE INITPLEASEWAIT NA NA N N NA IRADIO NA NA NA NA
