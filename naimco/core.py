@@ -1,6 +1,7 @@
 import logging
 import socket
 import asyncio
+from homeassistant.util import dt as dt_util
 
 from .controllers import Controller
 
@@ -68,7 +69,7 @@ class NaimCo:
         """
         await self.controller.connection_runner()
 
-    async def run_tasks(self, interval: int):
+    async def run_tasks(self, interval: int | None):
         """Run tasks in parallel."""
         reconnect_backoff_time = 10
         while True:
@@ -86,7 +87,8 @@ class NaimCo:
             try:
                 async with asyncio.TaskGroup() as tg:
                     tg.create_task(self.runner_task())
-                    tg.create_task(self.controller.keep_alive(interval))
+                    if interval:
+                        tg.create_task(self.controller.keep_alive(interval))
                     await self.controller.request_data_update()
             except* Exception as e:
                 _LOG.info(f"Tasks failed! {e.exceptions}")
@@ -117,7 +119,6 @@ class NaimCo:
     async def _call_callback(self):
         """Call the callback function if it is set and state.scn has changed"""
         if self.callback and self.state.scn != self.last_scn:
-            _LOG.debug("Calling callback %s", self.callback)
             self.last_scn = self.state.scn
             await self.callback(self.state)
 
@@ -129,6 +130,28 @@ class NaimCo:
     async def off(self):
         await self.controller.nvm.send_command("SETSTANDBY ON")
 
+    async def play(self):
+        await self.controller.nvm.send_command("PLAY")
+
+    async def stop(self):
+        await self.controller.nvm.send_command("STOP")
+
+    async def pause(self):
+        await self.controller.nvm.send_command("PAUSE ON")
+
+    async def nexttrack(self):
+        await self.controller.nvm.send_command("NEXTTRACK")
+
+    async def prevtrack(self):
+        await self.controller.nvm.send_command("PREVTRACK")
+
+    async def mute(self, mute: bool):
+        """Mute the Mu-so device."""
+        if mute:
+            await self.controller.nvm.send_command("SETMUTE ON")
+        else:
+            await self.controller.nvm.send_command("SETMUTE OFF")
+
     @property
     def standbystatus(self):
         return self.state.standbystatus
@@ -136,6 +159,10 @@ class NaimCo:
     @property
     def volume(self):
         return self.state.volume
+
+    @property
+    def is_muted(self):
+        return self.state.mute
 
     async def set_volume(self, volume):
         await self.controller.nvm.send_command(f"SETRVOL {volume}")
@@ -180,6 +207,14 @@ class NaimCo:
     async def select_preset(self, preset):
         await self.controller.nvm.send_command(f"GOTOPRESET {preset}")
 
+    async def play_row(self, row):
+        await self.controller.nvm.send_command(f"PLAYROW {row}")
+
+    async def select_row(self, row, wait_for_reply_timeout=None):
+        await self.controller.nvm.send_command(
+            f"SELECTROW {row}", wait_for_reply_timeout
+        )
+
     @property
     def viewstate(self):
         return self.state.viewstate
@@ -223,6 +258,24 @@ class NaimCo:
             return metadata.get("album", None)
         return None
 
+    @property
+    def media_source(self) -> str | None:
+        """Source of current playing media."""
+        # maybe this should just use input ?
+        return self.state.now_playing and self.state.now_playing.get("source", None)
+
+    @property
+    def media_duration(self) -> int | None:
+        """Duration of current playing track in seconds."""
+        if not self.state.now_playing:
+            return None
+        # spotify uses track_time
+        return self.state.now_playing.get("track_time", None)
+
+    @property
+    def now_playing_time(self) -> int | None:
+        return self.state.now_playing_time
+
     def get_now_playing(self):
         resp = {}
         try:
@@ -256,6 +309,7 @@ class NaimState:
     def __init__(self):
         # Sequence number, increment to send new state to HA
         self.scn = int(0)
+        self.last_update = {}
         # NVM properties
         self._input: str = None
         self._volume: int = None
@@ -269,6 +323,7 @@ class NaimState:
         self._roomname: str = None
         self._totalpresets: int | None = None
         self._presetblk: dict[int, dict] = {}
+        self._mute: bool = False
 
         # XML properties
         self.view_state = None
@@ -289,6 +344,16 @@ class NaimState:
     def volume(self, volume: int):
         if volume != self._volume:
             self._volume = volume
+            self.inc_scn()
+
+    @property
+    def mute(self) -> bool:
+        return self._mute
+
+    @mute.setter
+    def mute(self, mute: bool):
+        if mute != self._mute:
+            self._mute = mute
             self.inc_scn()
 
     @property
@@ -396,6 +461,8 @@ class NaimState:
     def set_now_playing(self, state):
         if self.now_playing != state:
             self.now_playing = state
+            self.last_update["now_playing"] = dt_util.utcnow()
+
             self.inc_scn()
 
     def set_active_list(self, state):
@@ -407,6 +474,8 @@ class NaimState:
     def set_now_playing_time(self, state):
         if self.now_playing_time != state:
             self.now_playing_time = state
+            self.last_update["now_playing_time"] = dt_util.utcnow()
+
             self.inc_scn()
 
     def set_bridge_co_app_versions(self, state):
