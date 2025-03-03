@@ -114,7 +114,11 @@ class NaimCo:
     async def shutdown(self):
         """Close the connection to the Mu-so device."""
         if self._tasks:
-            await self._tasks.cancel()
+            self._tasks.cancel()
+            try:
+                await self._tasks
+            except asyncio.CancelledError:
+                _LOG.debug("Tasks cancelled")
         await self.controller.shutdown()
 
     async def _call_callback(self):
