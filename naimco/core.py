@@ -1,8 +1,7 @@
 import logging
 import socket
 import asyncio
-from homeassistant.util import dt as dt_util
-
+import datetime as dt
 from .controllers import Controller
 
 _LOG = logging.getLogger(__name__)
@@ -98,6 +97,8 @@ class NaimCo:
                     _LOG.error(f"Failed to shutdown controller {e}")
                 finally:
                     self.controller = None
+                    await asyncio.sleep(reconnect_backoff_time)
+
                 # await self._device_disconnect()
 
     async def initialize(self, timeout=None):
@@ -324,6 +325,8 @@ class NaimState:
         self._totalpresets: int | None = None
         self._presetblk: dict[int, dict] = {}
         self._mute: bool = False
+        self._unit_temps: dict = {}
+        self._voltages: dict = {}
 
         # XML properties
         self.view_state = None
@@ -461,7 +464,7 @@ class NaimState:
     def set_now_playing(self, state):
         if self.now_playing != state:
             self.now_playing = state
-            self.last_update["now_playing"] = dt_util.utcnow()
+            self.last_update["now_playing"] = dt.datetime.utcnow()
 
             self.inc_scn()
 
@@ -474,9 +477,15 @@ class NaimState:
     def set_now_playing_time(self, state):
         if self.now_playing_time != state:
             self.now_playing_time = state
-            self.last_update["now_playing_time"] = dt_util.utcnow()
+            self.last_update["now_playing_time"] = dt.datetime.utcnow()
 
             self.inc_scn()
 
     def set_bridge_co_app_versions(self, state):
         self.bridge_co_app_versions = state
+
+    def set_unit_temp(self, unit: str, val: dict):
+        self._unit_temps[unit] = val
+
+    def set_voltage(self, output, val):
+        self._voltages[output] = val
