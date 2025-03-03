@@ -3,6 +3,7 @@ import base64
 import shlex
 import time
 import asyncio
+import re
 
 from .connection import Connection
 from .msg_processing import MessageStreamProcessor, gen_xml_command
@@ -67,18 +68,20 @@ class Controller:
         await self.nvm.send_command("GETVIEWSTATE")
         await self.nvm.send_command("GETPREAMP")
         await self.nvm.send_command("GETBRIEFNP")
-        await self.nvm.send_command("GETSTANDBYSTATUS")
+        await self.nvm.send_command("GETSTANDBYSTATUS", wait_for_reply_timeout=0.5)
         # Might need to be smarter about this if initial request failed partially
         if len(self.naimco.state.inputblk) == 0:
-            await self.nvm.send_command("GETINPUTBLK")
+            await self.nvm.send_command("GETINPUTBLK", wait_for_reply_timeout=0.5)
         if not self.naimco.state.product:
             await self.nvm.send_command("PRODUCT")
         if not self.naimco.state.serialnum:
             await self.nvm.send_command("GETSERIALNUM")
         if not self.naimco.state.roomname:
-            await self.nvm.send_command("GETROOMNAME")
+            await self.nvm.send_command("GETROOMNAME", wait_for_reply_timeout=0.5)
         if len(self.naimco.state.presetblk) == 0:
-            await self.nvm.send_command("GETTOTALPRESETS")
+            await self.nvm.send_command("GETTOTALPRESETS", wait_for_reply_timeout=0.5)
+        await self.nvm.send_command("GETTEMP")
+        await self.nvm.send_command("GETPSU")
 
         await self.send_command("GetNowPlaying")
 
@@ -384,16 +387,22 @@ class NVMController:
 
     def process_msg(self, msg):
         tokens = shlex.split(msg)
-        tokens.pop(0)  # #NVM token
-        event = tokens.pop(0)
-        event = event.replace(":", "_")
-        event = event.replace("-", "minus")
-        event = event.replace("+", "plus")
-        method = getattr(self.__class__, "_" + event, None)
-        if method:
-            method(self, tokens)
+        nvm = tokens.pop(0)  # #NVM token
+        if nvm == "#NVM":
+            event = tokens.pop(0)
+            event = event.replace(":", "_")
+            event = event.replace("-", "minus")
+            event = event.replace("+", "plus")
+            method = getattr(self.__class__, "_" + event, None)
+            if method:
+                method(self, tokens)
+            else:
+                _LOG.warn(f"Unhandled message from NVM {msg} >{event}<")
+        elif re.fullmatch(r"\d+V\d*", nvm):
+            _LOG.debug(f"Voltage event {nvm} {tokens}")
+            self.process_voltage(nvm, tokens)
         else:
-            _LOG.warn(f"Unhandled message from NVM {msg}")
+            _LOG.warn(f"Unrecognised message from NVM {msg}")
 
     def _GOTOPRESET(self, tokens):
         _LOG.debug(f"Playing iRadio preset number {tokens[0]} {tokens[1]}")
@@ -545,3 +554,31 @@ class NVMController:
         self.state.set_presetblk_entry(
             index, {"state": state, "name": name, "transport": transport}
         )
+
+    def _GETIC(self, tokens: list[str]):
+        # #NVM GETIC Psu ADC 757 ~ 31 degC)
+        # #NVM GETIC MAIN ADC 812 ~ 23 degC)
+        if tokens[0] == "BO_DETECT":
+            return
+        unit: str = tokens[0]
+        # max:int = int(tokens[1])
+        adc: int = int(tokens[2])
+        temp: int = int(tokens[4])
+        self.state.set_unit_temp(unit, {"adc": adc, "temp": temp})
+
+    def process_voltage(self, output, tokens: list[str]):
+        pass
+        # #NVM  PSU Manager Idle
+        # ->#NVM  PSU in standby#NVM  PSU = Digital Rails ON
+        # 1V2 reads 1209 mV
+        # 1V9 reads 1925 mV
+        # 3V3 reads 3271 mV
+        # 5V reads 5349 mV
+        # 1V85 reads 1849 mV
+        # 36V reads 33701 mV
+        # ->#NVM GETIC BO_DETECT = 1
+
+        # reads: str = tokens[0]
+        voltage: int = int(tokens[1])
+        # units :str = tokens[2]
+        self.state.set_voltage(output, voltage)
