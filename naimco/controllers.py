@@ -81,7 +81,9 @@ class Controller:
         if len(self.naimco.state.presetblk) == 0:
             await self.nvm.send_command("GETTOTALPRESETS", wait_for_reply_timeout=0.5)
         await self.nvm.send_command("GETTEMP")
-        await self.nvm.send_command("GETPSU")
+        await self.nvm.send_command("GETPSU", wait_for_reply_timeout=0.5)
+        if not self.naimco.state.illum:
+            await self.nvm.send_command("GETILLUM", wait_for_reply_timeout=0.5)
 
         await self.send_command("GetNowPlaying")
 
@@ -565,6 +567,18 @@ class NVMController:
         adc: int = int(tokens[2])
         temp: int = int(tokens[4])
         self.state.set_unit_temp(unit, {"adc": adc, "temp": temp})
+
+    def _SETILLUM(self, tokens):
+        # *NVM SETILLUM 2
+        # #NVM SETILLUM OK
+        illum = tokens[0]
+        if illum != "OK":
+            self.state.illum = int(illum)
+
+    def _GETILLUM(self, tokens):
+        # #NVM GETILLUM 2
+        illum = int(tokens[0])
+        self.state.illum = illum
 
     def process_voltage(self, output, tokens: list[str]):
         pass

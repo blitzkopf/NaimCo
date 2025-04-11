@@ -178,6 +178,13 @@ class NaimCo:
     async def volume_down(self):
         await self.controller.nvm.send_command("VOL-")
 
+    async def set_illum(self, illum):
+        await self.controller.nvm.send_command(
+            f"SETILLUM {illum}", wait_for_reply_timeout=0.02
+        )
+        # Setillum does not always return a reply, so we need to update the state manually
+        await self.controller.nvm.send_command("GETILLUM")
+
     @property
     def input(self):
         return self.state.input
@@ -331,6 +338,7 @@ class NaimState:
         self._mute: bool = False
         self._unit_temps: dict = {}
         self._voltages: dict = {}
+        self._illum: int | None = None
 
         # XML properties
         self.view_state = None
@@ -493,3 +501,13 @@ class NaimState:
 
     def set_voltage(self, output, val):
         self._voltages[output] = val
+
+    @property
+    def illum(self) -> int | None:
+        return self._illum
+
+    @illum.setter
+    def illum(self, illum: int | None):
+        if illum != self._illum:
+            self._illum = illum
+            self.inc_scn()
