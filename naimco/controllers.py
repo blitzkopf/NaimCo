@@ -580,8 +580,14 @@ class NVMController:
         illum = int(tokens[0])
         self.state.illum = illum
 
-    def process_voltage(self, output, tokens: list[str]):
+    def _PSU(self, tokens):
+        # #NVM  PSU Manager Idle
+        # ->#NVM  PSU in standby
+        # #NVM  PSU = Digital Rails ON
+        # Don't really know what this is about, just ignore for now
         pass
+
+    def process_voltage(self, output, tokens: list[str]):
         # #NVM  PSU Manager Idle
         # ->#NVM  PSU in standby#NVM  PSU = Digital Rails ON
         # 1V2 reads 1209 mV
