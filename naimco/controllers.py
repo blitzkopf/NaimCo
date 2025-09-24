@@ -580,19 +580,13 @@ class NVMController:
         illum = int(tokens[0])
         self.state.illum = illum
 
-    def process_voltage(self, output, tokens: list[str]):
+    def _PSU(self, tokens):
+        # Handles PSU status messages such as "PSU Manager Idle", "PSU in standby", or "PSU = Digital Rails ON".
+        # Currently, these messages are informational and not processed further.
         pass
-        # #NVM  PSU Manager Idle
-        # ->#NVM  PSU in standby#NVM  PSU = Digital Rails ON
-        # 1V2 reads 1209 mV
-        # 1V9 reads 1925 mV
-        # 3V3 reads 3271 mV
-        # 5V reads 5349 mV
-        # 1V85 reads 1849 mV
-        # 36V reads 33701 mV
-        # ->#NVM GETIC BO_DETECT = 1
 
-        # reads: str = tokens[0]
+    def process_voltage(self, output, tokens: list[str]):
+        # Handles voltage reading messages, e.g., "1V2 reads 1209 mV".
+        # Extracts and stores voltage values for different outputs.
         voltage: int = int(tokens[1])
-        # units :str = tokens[2]
         self.state.set_voltage(output, voltage)
