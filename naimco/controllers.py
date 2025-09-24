@@ -163,7 +163,7 @@ class Controller:
                 # Ignonre these 1 NotPlaying
                 _LOG.debug(f"Error from Mu-so 1 {data}")
             else:
-                _LOG.warn(f"Error from Mu-so {data}")
+                _LOG.warning(f"Error from Mu-so {data}")
         else:
             if tag == "reply":
                 id = data["id"]
@@ -175,7 +175,7 @@ class Controller:
                 if method:
                     method(self, val, id)
                 else:
-                    _LOG.warn(f"Unhandled XML message {tag} {key} data:{data}")
+                    _LOG.warning(f"Unhandled XML message {tag} {key} data:{data}")
         # is anyone waiting for an answer?
         if id in self.wait_events:
             _LOG.debug(f"Setting event for id {id}")
@@ -309,7 +309,7 @@ class Controller:
                 await asyncio.wait_for(event.wait(), wait_for_reply_timeout)
                 _LOG.debug(f"Reply received {id}")
             except asyncio.TimeoutError:
-                _LOG.warn(f"Timeout waiting for reply {id}")
+                _LOG.warning(f"Timeout waiting for reply {id}")
             del self.wait_events[id]
         else:
             await self.connection.send(cmd)
@@ -399,12 +399,12 @@ class NVMController:
             if method:
                 method(self, tokens)
             else:
-                _LOG.warn(f"Unhandled message from NVM {msg} >{event}<")
+                _LOG.warning(f"Unhandled message from NVM {msg} >{event}<")
         elif re.fullmatch(r"\d+V\d*", nvm):
             _LOG.debug(f"Voltage event {nvm} {tokens}")
             self.process_voltage(nvm, tokens)
         else:
-            _LOG.warn(f"Unrecognised message from NVM {msg}")
+            _LOG.warning(f"Unrecognised message from NVM {msg}")
 
     def _GOTOPRESET(self, tokens):
         _LOG.debug(f"Playing iRadio preset number {tokens[0]} {tokens[1]}")
@@ -436,15 +436,15 @@ class NVMController:
         # NVM SETSTANDBY OK
         # standby status not reported, we need to query
         if tokens[0] != "OK":
-            _LOG.warn(f"SETSTANDBY reports {tokens[0]}")
+            _LOG.warning(f"SETSTANDBY reports {tokens[0]}")
 
     def _SETRVOL(self, tokens):
         if tokens[0] != "OK":
-            _LOG.warn(f"SETRVOL reports {tokens[0]}")
+            _LOG.warning(f"SETRVOL reports {tokens[0]}")
 
     def _SETUNSOLICITED(self, tokens):
         if tokens[0] != "OK":
-            _LOG.warn(f"SETUNSOLICITED reports {tokens[0]}")
+            _LOG.warning(f"SETUNSOLICITED reports {tokens[0]}")
 
     def _GETVIEWSTATE(self, tokens):
         # #NVM GETVIEWSTATE INITPLEASEWAIT NA NA N N NA IRADIO NA NA NA NA
@@ -473,7 +473,7 @@ class NVMController:
             case "[11]":
                 _LOG.debug("Error 11 received, usually something trivial")
             case _:
-                _LOG.warn("Error from NVM:" + " ".join(tokens))
+                _LOG.warning("Error from NVM:" + " ".join(tokens))
 
     def _GETBRIEFNP(self, tokens):
         # #NVM GETBRIEFNP PLAY "Rás 2 RÚV 90.1 FM" "http://http.cdnlayer.com/vt/logo/logo-1318.jpg" NA NA NA
@@ -499,7 +499,7 @@ class NVMController:
     def _SETINPUT(self, tokens):
         # NVM SETINPUT OK
         if tokens[0] != "OK":
-            _LOG.warn(f"SETINPUT reports {tokens[0]}")
+            _LOG.warning(f"SETINPUT reports {tokens[0]}")
 
     def _GETINPUTBLK(self, tokens: list[str]):
         # NVM GETINPUTBLK 1 10 1 IRADIO "iRadio"
@@ -525,7 +525,7 @@ class NVMController:
     def _PLAY(self, tokens):
         # NVM PLAY OK
         if tokens[0] != "OK":
-            _LOG.warn(f"PLAY reports {tokens[0]}")
+            _LOG.warning(f"PLAY reports {tokens[0]}")
 
     def _PRODUCT(self, tokens):
         # NVM PRODUCT MUSO
