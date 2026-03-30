@@ -16,7 +16,7 @@ class Connection:
         self.writer = writer
 
     @classmethod
-    async def create_connection(self, ip_address, socket_api_port=NAIM_SOCKET_API_PORT):
+    async def create_connection(cls, ip_address, socket_api_port=NAIM_SOCKET_API_PORT):
         """Make the connection
 
         Parameters
@@ -34,7 +34,7 @@ class Connection:
         _LOG.debug("Connecting to  Naim Mu-So on ip: %s", ip_address)
 
         reader, writer = await asyncio.open_connection(ip_address, socket_api_port)
-        conn = Connection(reader, writer)
+        conn = cls(reader, writer)
         return conn
 
         # _LOG.debug("Created NaimCo instance for ip: %s", ip_address)
