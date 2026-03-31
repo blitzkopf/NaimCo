@@ -185,6 +185,12 @@ class NaimCo:
         # Setillum does not always return a reply, so we need to update the state manually
         await self.controller.nvm.send_command("GETILLUM")
 
+    async def set_cleaningmode(self, cleaningmode: bool):
+        if cleaningmode:
+            await self.controller.nvm.send_command("CLEANINGMODE ON")
+        else:
+            await self.controller.nvm.send_command("CLEANINGMODE OFF")
+
     @property
     def input(self):
         return self.state.input
@@ -323,22 +329,23 @@ class NaimState:
         self.scn = int(0)
         self.last_update = {}
         # NVM properties
-        self._input: str = None
-        self._volume: int = None
-        self._standbystatus: dict = None
-        self._bufferstate: int = None
+        self._input: str | None = None
+        self._volume: int | None = None
+        self._standbystatus: dict | None = None
+        self._bufferstate: int | None = None
         self._inputblk: dict[int, dict] = {}
-        self._viewstate: dict = None
-        self._briefnp: dict = None
-        self._product: str = None
-        self._serialnum: str = None
-        self._roomname: str = None
+        self._viewstate: dict | None = None
+        self._briefnp: dict | None = None
+        self._product: str | None = None
+        self._serialnum: str | None = None
+        self._roomname: str | None = None
         self._totalpresets: int | None = None
         self._presetblk: dict[int, dict] = {}
         self._mute: bool = False
         self._unit_temps: dict = {}
         self._voltages: dict = {}
         self._illum: int | None = None
+        self._cleaningmode: bool | None = False
 
         # XML properties
         self.view_state = None
@@ -352,7 +359,7 @@ class NaimState:
         self.scn += 1
 
     @property
-    def volume(self) -> int:
+    def volume(self) -> int | None:
         return self._volume
 
     @volume.setter
@@ -372,7 +379,7 @@ class NaimState:
             self.inc_scn()
 
     @property
-    def input(self) -> str:
+    def input(self) -> str | None:
         return self._input
 
     @input.setter
@@ -382,28 +389,28 @@ class NaimState:
             self.inc_scn()
 
     @property
-    def viewstate(self) -> dict:
+    def viewstate(self) -> dict | None:
         return self._viewstate
 
     @viewstate.setter
-    def viewstate(self, state: dict):
+    def viewstate(self, state: dict | None):
         """NVM view state"""
         if state != self._viewstate:
             self._viewstate = state
             self.inc_scn()
 
     @property
-    def briefnp(self) -> dict:
+    def briefnp(self) -> dict | None:
         return self._briefnp
 
     @briefnp.setter
-    def briefnp(self, briefnp):
+    def briefnp(self, briefnp: dict | None):
         if briefnp != self._briefnp:
             self._briefnp = briefnp
             self.inc_scn()
 
     @property
-    def bufferstate(self) -> int:
+    def bufferstate(self) -> int | None:
         return self._bufferstate
 
     @bufferstate.setter
@@ -411,7 +418,7 @@ class NaimState:
         self._bufferstate = bufferstate
 
     @property
-    def standbystatus(self) -> dict:
+    def standbystatus(self) -> dict | None:
         return self._standbystatus
 
     @standbystatus.setter
@@ -421,22 +428,22 @@ class NaimState:
             self.inc_scn()
 
     @property
-    def inputblk(self) -> list[dict]:
+    def inputblk(self) -> dict[int, dict]:
         return self._inputblk
 
     def set_inputblk_entry(self, index: int, val: dict):
         self._inputblk[index] = val
 
     @property
-    def product(self) -> str:
+    def product(self) -> str | None:
         return self._product
 
     @product.setter
-    def product(self, product: str):
+    def product(self, product: str | None):
         self._product = product
 
     @property
-    def serialnum(self) -> str:
+    def serialnum(self) -> str | None:
         return self._serialnum
 
     @serialnum.setter
@@ -444,7 +451,7 @@ class NaimState:
         self._serialnum = serialnum
 
     @property
-    def roomname(self) -> str:
+    def roomname(self) -> str | None:
         return self._roomname
 
     @roomname.setter
@@ -460,7 +467,7 @@ class NaimState:
         self._totalpresets = totalpresets
 
     @property
-    def presetblk(self) -> list[dict]:
+    def presetblk(self) -> dict[int, dict]:
         return self._presetblk
 
     def set_presetblk_entry(self, index: int, val: dict):
@@ -510,4 +517,14 @@ class NaimState:
     def illum(self, illum: int | None):
         if illum != self._illum:
             self._illum = illum
+            self.inc_scn()
+
+    @property
+    def cleaningmode(self) -> bool | None:
+        return self._cleaningmode
+
+    @cleaningmode.setter
+    def cleaningmode(self, cleaningmode: bool | None):
+        if cleaningmode != self._cleaningmode:
+            self._cleaningmode = cleaningmode
             self.inc_scn()
