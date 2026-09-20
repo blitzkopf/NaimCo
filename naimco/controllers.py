@@ -61,6 +61,7 @@ class Controller:
 
         Stops the connection runner and closes the connection.
         """
+        assert self.connection is not None, "Connection is not established"
         await self.connection.close()
 
     async def request_data_update(self):
@@ -104,6 +105,7 @@ class Controller:
         parser = MessageStreamProcessor()
         # what happens if msgs are split on non char boundaries?
         while True:
+            assert self.connection is not None, "Connection is not established"
             data = await self.connection.receive()
             if len(data) > 0:
                 _LOG.debug(f"Received: {data!r}")
@@ -295,6 +297,7 @@ class Controller:
             Parameters to send with the command
 
         """
+        assert self.connection is not None, "Connection is not established"
         self.cmd_id_seq += 1
         id = f"{self.cmd_id_seq}"
         cmd = gen_xml_command(command, id, payload)
@@ -579,6 +582,20 @@ class NVMController:
         # #NVM GETILLUM 2
         illum = int(tokens[0])
         self.state.illum = illum
+
+    def _GETCLEANINGMODE(self, tokens):
+        # #NVM GETCLEANINGMODE ON
+        # the respone to SETCLEANINGMODE is GETCLEANINGMODE go figure
+        cleaning_mode = tokens[0] == "ON"
+        self.state.cleaningmode = cleaning_mode
+
+    def _CLEANINGMODE(self, tokens):
+        # #NVM CLEANINGMODE OK
+        # CLEANINGMODE OK follows the GETCLEANINGMODE response for some reason
+        # I'dont think this has any practical effect
+        response = tokens[0]
+        if response != "OK":
+            _LOG.warning("Unexpected response for CLEANINGMODE: %s", response)
 
     def _PSU(self, tokens):
         # Handles PSU status messages such as "PSU Manager Idle", "PSU in standby", or "PSU = Digital Rails ON".

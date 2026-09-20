@@ -33,13 +33,13 @@ class NaimCo:
             socket.inet_aton(ip_address)
         except OSError as error:
             raise ValueError("Not a valid IP address string") from error
-        #: The systems's ip address
-        self.ip_address = ip_address
-        self.cmd_id = 0
-        self.state = NaimState()
-        self.last_scn = self.state.scn
-        self.controller = None
-        self.version = None
+        #: The system's ip address
+        self.ip_address: str = ip_address
+        self.cmd_id: int = 0
+        self.state: NaimState = NaimState()
+        self.last_scn: int = self.state.scn
+        self.controller: Controller | None = None
+        self.version: str | None = None
         self.callback = callback
         _LOG.debug("Created NaimCo instance for ip: %s", ip_address)
 
@@ -66,6 +66,7 @@ class NaimCo:
         """Coroutine that need to run in seperate task to take care of reading data from
         the Mu-so device
         """
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.connection_runner()
 
     async def run_tasks(self, interval: int | None):
@@ -107,6 +108,7 @@ class NaimCo:
         Optionally set timeout interval in seconds for Mu-so device, if Mu-so does not receive
         a message in that interval it will disconnect.
         """
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.initialize()
         if timeout:
             await self.controller.set_heartbeat_timout(timeout)
@@ -119,7 +121,9 @@ class NaimCo:
                 await self._tasks
             except asyncio.CancelledError:
                 _LOG.debug("Tasks cancelled")
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.shutdown()
+        self.controller = None
 
     async def _call_callback(self):
         """Call the callback function if it is set and state.scn has changed"""
@@ -128,33 +132,42 @@ class NaimCo:
             await self.callback(self.state)
 
     async def on(self):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command("SETSTANDBY OFF")
         await asyncio.sleep(3)
         await self.controller.nvm.send_command("GETSTANDBYSTATUS")
 
     async def off(self):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command("SETSTANDBY ON")
 
     async def play(self):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command("PLAY")
 
     async def stop(self):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command("STOP")
 
     async def pause(self):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command("PAUSE ON")
 
     async def nexttrack(self):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command("NEXTTRACK")
 
     async def prevtrack(self):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command("PREVTRACK")
 
     async def mute(self, mute: bool):
         """Mute the Mu-so device."""
         if mute:
+            assert self.controller is not None, "Controller is not defined"
             await self.controller.nvm.send_command("SETMUTE ON")
         else:
+            assert self.controller is not None, "Controller is not defined"
             await self.controller.nvm.send_command("SETMUTE OFF")
 
     @property
@@ -170,15 +183,19 @@ class NaimCo:
         return self.state.mute
 
     async def set_volume(self, volume):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command(f"SETRVOL {volume}")
 
     async def volume_up(self):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command("VOL+")
 
     async def volume_down(self):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command("VOL-")
 
     async def set_illum(self, illum):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command(
             f"SETILLUM {illum}", wait_for_reply_timeout=0.02
         )
@@ -186,6 +203,7 @@ class NaimCo:
         await self.controller.nvm.send_command("GETILLUM")
 
     async def set_cleaningmode(self, cleaningmode: bool):
+        assert self.controller is not None, "Controller is not defined"
         if cleaningmode:
             await self.controller.nvm.send_command("CLEANINGMODE ON")
         else:
@@ -220,15 +238,19 @@ class NaimCo:
         return {index: preset["name"] for index, preset in self.state.presetblk.items()}
 
     async def select_input(self, input):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command(f"SETINPUT {input}")
 
     async def select_preset(self, preset):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command(f"GOTOPRESET {preset}")
 
     async def play_row(self, row):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command(f"PLAYROW {row}")
 
     async def select_row(self, row, wait_for_reply_timeout=None):
+        assert self.controller is not None, "Controller is not defined"
         await self.controller.nvm.send_command(
             f"SELECTROW {row}", wait_for_reply_timeout
         )
@@ -296,19 +318,20 @@ class NaimCo:
 
     def get_now_playing(self):
         resp = {}
-        try:
-            md = self.state.now_playing["metadata"]
-            resp["artist"] = md.get("artist")
-            resp["album"] = md.get("album")
-        except Exception:
-            # _LOG.debug("No metadata for now playing")
-            pass
-        try:
-            resp["source"] = self.state.now_playing["source"]
-            resp["title"] = self.state.now_playing.get("title")
-        except Exception:
-            # _LOG.debug(f"No playback for now playing {self.state.now_playing}")
-            pass
+        if self.state.now_playing and isinstance(self.state.now_playing, dict):
+            try:
+                md = self.state.now_playing["metadata"]
+                resp["artist"] = md.get("artist")
+                resp["album"] = md.get("album")
+            except Exception:
+                # _LOG.debug("No metadata for now playing")
+                pass
+            try:
+                resp["source"] = self.state.now_playing["source"]
+                resp["title"] = self.state.now_playing.get("title")
+            except Exception:
+                # _LOG.debug(f"No playback for now playing {self.state.now_playing}")
+                pass
         try:
             if resp["source"] == "iradio":
                 resp["string"] = f"{resp.get('artist')} {resp.get('title')}"
